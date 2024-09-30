@@ -1,0 +1,19 @@
+ontologies:
+  - name: "ENVO"
+    source: "sqlite:obo:envo"  # Can be a local file or OAK shorthand
+    axioms:
+      - "is_a"
+      - "part_of"
+    metadata:
+      - "synonyms"
+      - "definitions"
+      - "xrefs"
+  - name: "GO"
+    source: "sqlite:obo:go"
+    axioms:
+      - "is_a"
+      - "regulates"
+    metadata:
+      - "definitions"
+      - "synonyms"
+      - "xrefs"

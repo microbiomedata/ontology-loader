@@ -10,6 +10,8 @@ readme = "README.md"
 python = "^3.11"
 importlib-metadata = "^4.8.0"
 pymongo = "^4.9.1"
+nmdc-schema = "^10.8.0"
+oaklib = "^0.6.16"
 
 [tool.poetry.group.dev.dependencies]
 pytest = {version = ">=7.1.2"}
