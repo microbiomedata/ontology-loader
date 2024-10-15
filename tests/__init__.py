@@ -1,1 +1,1 @@
-"""Tests for ontology_loader."""
+"""Tests for ontology-loader."""

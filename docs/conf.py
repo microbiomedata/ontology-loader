@@ -10,7 +10,7 @@ from ontology_loader import __version__
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'ontology_loader'
+project = 'ontology-loader'
 copyright = f"{date.today().year}, Author 1 <smoxon@lbl.gov>"
 author = 'Author 1 <smoxon@lbl.gov>'
 release = __version__

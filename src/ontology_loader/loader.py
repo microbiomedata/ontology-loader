@@ -1,7 +1,9 @@
 """load ontology"""
 import logging
 from pathlib import Path
-
+from oaklib import get_implementation_from_shorthand
+from oaklib.interfaces import OboGraphInterface
+from oaklib.datamodels.obograph import GraphDocument, Graph
 import yaml
 from oaklib import get_implementation_from_shorthand
 from nmdc_schema.nmdc import OntologyClass
@@ -93,14 +95,31 @@ def process_all_ontologies(ontology_config, oak_config):
 
     # Construct the path to the file in the parent directory
     oak_config_file = current_file_dir.parent / oak_config
-    oi = get_adapter(oak_config_file)
 
-    for ontology in ontology_config['ontologies']:
-        initial_term_list = onto_query([".desc//p=i"], oi)
-        logging.info(f"Length of initial term list: {len(initial_term_list)}")
+    # Initialize an OAK implementation for the OBO Graph format
+    ontology_source = "sqlite:obo:envo"  # OAK shorthand for the ENVO ontology
+    oi: OboGraphInterface = get_adapter(ontology_source)
 
-        print(f"Processing ontology: {ontology}")
-        # process_ontology(ontology, adapter=oi)
+    graph = oi.as_obograph()
+
+    for node in graph.nodes:
+        if node.id.startswith("ENVO"):
+            print(node.id)
+            print(node.lbl)
+            if node.meta.definition is not None:
+                print(node.meta.definition.val)
+            if node.meta.xrefs is not None and node.meta.xrefs != []:
+                for xref in node.meta.xrefs:
+                    print(xref.val)
+            if node.meta.synonyms is not None and node.meta.synonyms != []:
+                for synonym in node.meta.synonyms:
+                    print(synonym.val)
+
+    # for edge in graph.edges:
+    #     print(edge)
+
+
+    # You can also filter terms based on specific predicates like 'is_a' or 'part_of'
 
 # Load configuration and process
 ontology_config = load_config("ontology-config.yaml")
