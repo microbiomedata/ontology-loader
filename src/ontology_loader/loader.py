@@ -33,7 +33,8 @@ def _compress_xref(xref_val, converter):
     """Helper to compress xrefs, including handling for https to http conversion."""
     curie = converter.compress(str(xref_val))
     if curie and curie.startswith('https'):
-        curie = converter.compress(curie.replace('https', 'http'))
+        print(curie)
+        curie = converter.compress(curie.replace('http', 'https'))
     return curie
 
 
@@ -63,7 +64,7 @@ def fetch_metadata(node, cmaps):
     metadata = {
         'alternative_names': _extract_synonyms(node),
         'description': _extract_description(node),
-        'xrefs': _extract_xrefs(node, cmaps)
+        'alternative_identifiers': _extract_xrefs(node, cmaps)
     }
     return metadata
 
