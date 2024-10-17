@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ontology_loader"
-version = "0.0.0"
+version = "0.0.0.post4.dev0+aaeb412"
 description = "ontology_loader"
 authors = ["Author 1 <smoxon@lbl.gov>"]
 license = "MIT"
@@ -10,9 +10,11 @@ readme = "README.md"
 python = "^3.11"
 importlib-metadata = "^4.8.0"
 pymongo = "^4.9.1"
-nmdc-schema = "^10.8.0"
+nmdc-schema = { git = "https://github.com/microbiomedata/nmdc-schema", branch = "ontology_metadata" }
 oaklib = "^0.6.16"
 click = "^8.1.7"
+curies = "^0.8.0"
+linkml-store = "^0.2.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = {version = ">=7.1.2"}
@@ -33,7 +35,7 @@ myst-parser = {version = ">=0.18.1"}
 ontology_loader = "ontology_loader.cli:main"
 
 [tool.poetry-dynamic-versioning]
-enable = true
+enable = false
 vcs = "git"
 style = "pep440"
 

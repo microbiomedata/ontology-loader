@@ -1,135 +1,126 @@
 """load ontology"""
 import logging
-from pathlib import Path
-from oaklib import get_implementation_from_shorthand
-from oaklib.interfaces import OboGraphInterface
-from oaklib.datamodels.obograph import GraphDocument, Graph
-import yaml
-from oaklib import get_implementation_from_shorthand
+from prefixmaps import load_context
+from curies import Converter
 from nmdc_schema.nmdc import OntologyClass
-from pymongo import MongoClient
 from oaklib import get_adapter
-from oaklib.query import onto_query, SimpleQueryTerm
+from pprint import pprint
+from oaklib.interfaces import OboGraphInterface
+from linkml_store import Client
+import importlib.resources
+import yaml
 
-# Configure logging
+def find_schema():
+    # Use importlib.resources to get the path of the package's YAML file
+    yaml_file_path = importlib.resources.files('nmdc_schema').joinpath('nmdc_materialized_patterns.yaml')
+    return str(yaml_file_path)
+
 logging.basicConfig(level=logging.WARN, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def load_config(file_name: str) -> dict:
+
+def _extract_synonyms(node):
+    """Extract alternative names from node's synonyms."""
+    synonyms = node.meta.synonyms if node.meta else []
+    return [synonym.val for synonym in synonyms] if synonyms else []
+
+
+def _extract_description(node):
+    """Extract description from node's definition."""
+    return node.meta.definition.val if node.meta and node.meta.definition else "No definition available"
+
+
+def _compress_xref(xref_val, converter):
+    """Helper to compress xrefs, including handling for https to http conversion."""
+    curie = converter.compress(str(xref_val))
+    if curie and curie.startswith('https'):
+        curie = converter.compress(curie.replace('https', 'http'))
+    return curie
+
+
+def _extract_xrefs(node, cmaps):
+    """Extract and contract xrefs using the provided prefix map."""
+    xrefs = node.meta.xrefs if node.meta else []
+    converter = Converter.from_prefix_map(cmaps, strict=False)
+    contracted_xrefs = []
+
+    for xref in xrefs:
+        if not xref.val:
+            continue
+        curie = _compress_xref(xref.val, converter)
+        contracted_xrefs.append(curie or xref.val)
+
+    return contracted_xrefs
+
+
+def fetch_metadata(node, cmaps):
     """
-    Load a YAML configuration file from the src directory
+    Fetch metadata for a given ontology term based on the configuration.
 
-    :param file_name: The name of the YAML file to load
-    :return: The configuration as a dictionary
-    """
-    # Get the directory of the current file
-    current_file_dir = Path(__file__).resolve().parent
-
-    # Construct the path to the src directory one level above
-    config_path = current_file_dir.parent / file_name
-
-    # Open and load the YAML file
-    with open(config_path, 'r') as file:
-        return yaml.safe_load(file)
-
-# Function to fetch metadata based on config
-def fetch_metadata(oi, curie, metadata_config):
-    """
-    Fetch metadata for a given ontology term based on the configuration
-
-    :param oi: The ontology implementation
-    :param curie: The CURIE of the ontology term
-    :param metadata_config: The metadata configuration
+    :param node: The ontology node
+    :param cmaps: The prefix_converter from prefixmaps using the "merged" context
     :return: A dictionary of metadata
     """
-    metadata = {}
-
-    if 'synonyms' in metadata_config:
-        synonyms = oi.synonyms(curie)
-        metadata['synonyms'] = [synonym.val for synonym in synonyms] if synonyms else []
-
-    if 'definitions' in metadata_config:
-        definition = oi.definition(curie)
-        metadata['description'] = definition if definition else "No definition available"
-
-    if 'xrefs' in metadata_config:
-        xrefs = oi.xrefs(curie)
-        metadata['xrefs'] = xrefs if xrefs else []
-
+    metadata = {
+        'alternative_names': _extract_synonyms(node),
+        'description': _extract_description(node),
+        'xrefs': _extract_xrefs(node, cmaps)
+    }
     return metadata
 
-# Function to process ontologies as per the config
-def process_ontology(metadata_config, adapter):
-    """
-    Process an ontology based on the configuration
 
-    :param source: The source of the ontology
-    :param metadata_config: The metadata configuration
-    :return: None
-    """
+class OntologyProcessor:
+    def __init__(self, ontology="envo"):
+        self.ontology = ontology
+        self.db = None
+        self.graph = None
+        self.cmaps = None
 
-    # Iterate over all terms in the ontology
-    for curie, label in adapter.entities(owl_type='class'):
-        # Fetch metadata (definitions, synonyms, etc.)
-        metadata = fetch_metadata(adapter, curie, metadata_config)
+    def connect_to_database(self, db_url="mongodb://localhost:27017", db_name="test"):
+        # Initialize MongoDB using LinkML-store's client
+        self.db = Client()
+        self.db.attach_database(db_url, db_name)
+        self.db.set_schema_view("")
 
-        # Create NMDC OntologyClass object
-        ontology_class = OntologyClass(
-            id=curie,
-            name=label,
-            **metadata
-        )
+    def initialize_graph(self):
+        # Initialize an OAK to download the ontology
+        ontology_source = f"sqlite:obo:{self.ontology}"
+        oi: OboGraphInterface = get_adapter(ontology_source)
+        self.graph = oi.as_obograph()
 
-        # Example print (or insert into MongoDB)
-        print(ontology_class.json())  # Replace with MongoDB insertion logic
+    def initialize_prefix_map(self):
+        # Initialize prefix map to contract URIs in xrefs to curies
+        context = load_context("merged")
+        extended_prefix_map = context.as_extended_prefix_map()
+        converter = Converter.from_extended_prefix_map(extended_prefix_map)
+        self.cmaps = converter.prefix_map
 
-# Function to process all ontologies from config
-def process_all_ontologies(ontology_config, oak_config):
-    """
-    Process all ontologies based on the configuration
+    def process_nodes(self):
+        # Process ontology nodes and insert them into the database
+        ontology_classes = []
+        for node in self.graph.nodes:
+            if node.id.startswith("ENVO"):
+                metadata = fetch_metadata(node, self.cmaps)
+                pprint(metadata)
+                # Create an NMDC OntologyClass object
+                ontology_class = OntologyClass(
+                    id=node.id,
+                    name=node.lbl,
+                    type="nmdc:OntologyClass",
+                    **metadata
+                )
+                ontology_classes.append(ontology_class)
 
-    :param ontology_config: The ontologies to load configuration dictionary
-    :param oak_config: The OAK adapter configuration dictionary
-    :return: None
-    """
-    current_file_dir = Path(__file__).resolve().parent
+        self.db.create_collection("OntologyClass", recreate_if_exists=True).insert(ontology_classes)
 
-    # Construct the path to the file in the parent directory
-    oak_config_file = current_file_dir.parent / oak_config
-
-    # Initialize an OAK implementation for the OBO Graph format
-    ontology_source = "sqlite:obo:envo"  # OAK shorthand for the ENVO ontology
-    oi: OboGraphInterface = get_adapter(ontology_source)
-
-    graph = oi.as_obograph()
-
-    for node in graph.nodes:
-        if node.id.startswith("ENVO"):
-            print(node.id)
-            print(node.lbl)
-            if node.meta.definition is not None:
-                print(node.meta.definition.val)
-            if node.meta.xrefs is not None and node.meta.xrefs != []:
-                for xref in node.meta.xrefs:
-                    print(xref.val)
-            if node.meta.synonyms is not None and node.meta.synonyms != []:
-                for synonym in node.meta.synonyms:
-                    print(synonym.val)
-
-    # for edge in graph.edges:
-    #     print(edge)
+    def process(self):
+        self.initialize_graph()
+        self.connect_to_database()
+        self.initialize_prefix_map()
+        self.process_nodes()
 
 
-    # You can also filter terms based on specific predicates like 'is_a' or 'part_of'
-
-# Load configuration and process
-ontology_config = load_config("ontology-config.yaml")
-print(ontology_config)
-process_all_ontologies(ontology_config, "oak-config.yaml")
-
-
-# client = MongoClient('mongodb://localhost:27017/')
-# db = client['ontology_db']
-# collection = db['terms']
-#
-# # Insert into MongoDB
-# collection.insert_one(ontology_class.dict())
+# Example usage
+print("Processing ENVO ontology")
+print("find the NMDC schema file", find_schema())
+processor = OntologyProcessor(ontology="envo")
+processor.process()
