@@ -1,5 +1,6 @@
 """load ontology"""
 import logging
+from linkml_store.api.config import ClientConfig
 from prefixmaps import load_context
 from curies import Converter
 from nmdc_schema.nmdc import OntologyClass
@@ -8,7 +9,6 @@ from pprint import pprint
 from oaklib.interfaces import OboGraphInterface
 from linkml_store import Client
 import importlib.resources
-import yaml
 
 def find_schema():
     # Use importlib.resources to get the path of the package's YAML file
@@ -70,18 +70,21 @@ def fetch_metadata(node, cmaps):
 
 class OntologyProcessor:
     def __init__(self, ontology="envo"):
+        self.client_config = None
         self.ontology = ontology
         self.db = None
         self.graph = None
         self.cmaps = None
 
-    def connect_to_database(self, db_url="mongodb://localhost:27017", db_name="test"):
+    def connect_to_destination_store(self,
+                                     db_url="mongodb://localhost:27017",
+                                     db_name="test"):
         # Initialize MongoDB using LinkML-store's client
         self.db = Client()
+        self.client_config = ClientConfig(handle=db_url, schema_path=find_schema())
         self.db.attach_database(db_url, db_name)
-        self.db.set_schema_view("")
 
-    def initialize_graph(self):
+    def initialize_oak(self):
         # Initialize an OAK to download the ontology
         ontology_source = f"sqlite:obo:{self.ontology}"
         oi: OboGraphInterface = get_adapter(ontology_source)
@@ -94,7 +97,7 @@ class OntologyProcessor:
         converter = Converter.from_extended_prefix_map(extended_prefix_map)
         self.cmaps = converter.prefix_map
 
-    def process_nodes(self):
+    def process_ontology_nodes(self):
         # Process ontology nodes and insert them into the database
         ontology_classes = []
         for node in self.graph.nodes:
@@ -113,10 +116,10 @@ class OntologyProcessor:
         self.db.create_collection("OntologyClass", recreate_if_exists=True).insert(ontology_classes)
 
     def process(self):
-        self.initialize_graph()
-        self.connect_to_database()
         self.initialize_prefix_map()
-        self.process_nodes()
+        self.initialize_oak()
+        self.connect_to_destination_store()
+        self.process_ontology_nodes()
 
 
 # Example usage
