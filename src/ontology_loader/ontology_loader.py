@@ -51,13 +51,13 @@ def process_ontology_nodes(graph, converter):
 
 
 @click.command()
-@click.option('--db-to-load-url', default='mongodb://localhost:27017', help='MongoDB connection URL')
-@click.option('--db-to-load-name', default='test', help='Database name')
+@click.option('--db-url', default='mongodb://localhost:27017', help='MongoDB connection URL')
+@click.option('--db-name', default='test', help='Database name')
 @click.option('--source-ontology-url', default='https://purl.obolibrary.org/obo/envo.json', help='Ontology URL')
-def main(db_url, db_name, ontology_url):
+def main(db_url, db_name, source_ontology_url):
     """Main function to process ontology and store metadata."""
     # Download the ontology file
-    path = pystow.ensure("tmp", "envo.json", url=ontology_url)
+    path = pystow.ensure("tmp", "envo.json", url=source_ontology_url)
 
     # Load the ontology graph
     graphdoc = json.load(open(path))
