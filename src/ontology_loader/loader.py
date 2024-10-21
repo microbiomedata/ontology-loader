@@ -9,6 +9,7 @@ from pprint import pprint
 from oaklib.interfaces import OboGraphInterface
 from linkml_store import Client
 import importlib.resources
+import concurrent.futures
 
 def find_schema():
     # Use importlib.resources to get the path of the package's YAML file
@@ -33,24 +34,41 @@ def _compress_xref(xref_val, converter):
     """Helper to compress xrefs, including handling for https to http conversion."""
     curie = converter.compress(str(xref_val))
     if curie and curie.startswith('https'):
-        print(curie)
         curie = converter.compress(curie.replace('http', 'https'))
+        if curie is None:
+            logging.INFO("xref_val is:", xref_val)
+        else:
+            logging.INFO("curie is: ", curie)
     return curie
 
 
 def _extract_xrefs(node, cmaps):
     """Extract and contract xrefs using the provided prefix map."""
     xrefs = node.meta.xrefs if node.meta else []
-    converter = Converter.from_prefix_map(cmaps, strict=False)
+    # converter = Converter.from_prefix_map(cmaps, strict=False)
     contracted_xrefs = []
 
     for xref in xrefs:
-        if not xref.val:
+        # chuck out all the non-CURIE xrefs
+        if not xref.val or xref.val.startswith("http") or  " " in xref.val:
             continue
-        curie = _compress_xref(xref.val, converter)
-        contracted_xrefs.append(curie or xref.val)
+        # curie = _compress_xref(xref.val, converter)
+        contracted_xrefs.append((xref.val.replace("<", "").replace(">", "")))
 
     return contracted_xrefs
+
+
+def process_node(node, cmaps):
+    """Process a single ontology node."""
+    if node.id.startswith("ENVO"):
+        metadata = fetch_metadata(node, cmaps)
+        ontology_class = OntologyClass(
+            id=node.id,
+            name=node.lbl,
+            type="nmdc:OntologyClass",
+            **metadata
+        )
+        return ontology_class
 
 
 def fetch_metadata(node, cmaps):
@@ -66,6 +84,7 @@ def fetch_metadata(node, cmaps):
         'description': _extract_description(node),
         'alternative_identifiers': _extract_xrefs(node, cmaps)
     }
+    logging.INFO(metadata)
     return metadata
 
 
@@ -99,20 +118,24 @@ class OntologyProcessor:
         self.cmaps = converter.prefix_map
 
     def process_ontology_nodes(self):
-        # Process ontology nodes and insert them into the database
+        """Process ontology nodes in parallel."""
         ontology_classes = []
-        for node in self.graph.nodes:
-            if node.id.startswith("ENVO"):
-                metadata = fetch_metadata(node, self.cmaps)
-                pprint(metadata)
-                # Create an NMDC OntologyClass object
-                ontology_class = OntologyClass(
-                    id=node.id,
-                    name=node.lbl,
-                    type="nmdc:OntologyClass",
-                    **metadata
-                )
-                ontology_classes.append(ontology_class)
+
+        # Use ThreadPoolExecutor to process nodes concurrently
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_to_node = {
+                executor.submit(process_node, node, self.cmaps): node
+                for node in self.graph.nodes
+            }
+
+            for future in concurrent.futures.as_completed(future_to_node):
+                node = future_to_node[future]
+                try:
+                    ontology_class = future.result()
+                    if ontology_class:
+                        ontology_classes.append(ontology_class)
+                except Exception as exc:
+                    logging.WARN(f"Node {node.id} generated an exception: {exc}")
 
         self.db.create_collection("OntologyClass", recreate_if_exists=True).insert(ontology_classes)
 
