@@ -1,5 +1,7 @@
 
 from typing import List
+
+from linkml_runtime import SchemaView
 from nmdc_schema.nmdc import OntologyClass
 import click
 import pystow
@@ -12,7 +14,7 @@ from prefixmaps import load_context
 from curies import Converter
 from linkml_store.api.database import Database
 
-logging.basicConfig(level=logging.WARN, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def initialize_prefix_map() -> dict:
     """Initialize prefix map to contract URIs in xrefs to curies."""
@@ -22,10 +24,11 @@ def initialize_prefix_map() -> dict:
     return converter.prefix_map
 
 
-def find_schema():
+def find_schema() -> SchemaView:
     """Find the schema file path."""
     yaml_file_path = importlib.resources.files('nmdc_schema').joinpath('nmdc_materialized_patterns.yaml')
-    return str(yaml_file_path)
+    sv = SchemaView(yaml_file_path)
+    return sv
 
 
 def connect_to_destination_store():
@@ -36,7 +39,7 @@ def connect_to_destination_store():
     """
 
     client = Client()
-    db = client.attach_database("mongodb://nmdc", "nmdc")
+    db = client.attach_database("mongodb", alias="nmdc", schema_view=find_schema())
     return db
 
 def create_ontology_class(node: dict):
@@ -148,7 +151,7 @@ def main(db_url, db_name, source_ontology_url):
     converter = Converter.from_prefix_map(cmaps, strict=False)
 
     # Process ontology nodes
-    term_dicts, term_classes = process_ontology_nodes(graph, converter)
+    term_dicts, _ = process_ontology_nodes(graph, converter)
 
 
     # Connect to the database
