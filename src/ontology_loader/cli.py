@@ -11,6 +11,15 @@ import importlib.resources
 import logging
 from prefixmaps import load_context
 from curies import Converter
+from linkml.validator import Validator
+from linkml.validator.plugins import PydanticValidationPlugin
+
+validator = Validator(
+    schema = str(importlib.resources.files('nmdc_schema').joinpath('nmdc_materialized_patterns.yaml'))
+    # ,validation_plugins=[PydanticValidationPlugin()]
+)
+
+print (str(importlib.resources.files('nmdc_schema').joinpath('nmdc_materialized_patterns.yaml')))
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -48,7 +57,7 @@ def create_ontology_class(node: dict):
     :return: An OntologyClass object
     """
 
-    return OntologyClass(
+    oclass = OntologyClass(
         id=node.get("id"),
         name=node.get("lbl"),
         type="nmdc:OntologyClass",
@@ -56,6 +65,12 @@ def create_ontology_class(node: dict):
         alternative_names=(node.get("synonyms") or []),
         description=node.get("definition")
     )
+
+    if validator.validate(oclass):
+        return oclass
+    else:
+        logging.warning(f"Validation failed for {node.get('id')}")
+        return None
 
 
 def process_ontology_nodes(graph, converter) -> (List[dict], List[OntologyClass]):
