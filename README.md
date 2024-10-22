@@ -20,6 +20,8 @@ up-to-date using [cruft](https://cruft.github.io/cruft/).
 
 #### Basic mongosh commands
 ```bash
+% docker ps
+% docker exec -it [mongodb-container-id] bash
 % mongosh
 % show dbs
 % use test
