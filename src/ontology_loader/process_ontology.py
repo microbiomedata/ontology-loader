@@ -7,9 +7,8 @@ def get_ontology_terms_and_metadata(ontology: str):
     for entity in adapter.entities():
         if entity.startswith("ENVO:"):
             print(entity)
-            print(adapter.aliases(entity))
+            print(adapter.entity_aliases(entity))
             print(adapter.definition(entity))
-            print(adapter.xrefs(entity))
 
 def get_ontology_relations_closure(ontology: str, predicates: list = None):
     # Load the ontology graph
