@@ -1,11 +1,12 @@
-
+import gzip
+import shutil
+from pathlib import Path
 from typing import List
-
+import requests
 from linkml_runtime import SchemaView
 from nmdc_schema.nmdc import OntologyClass
 import click
 import pystow
-import json
 from linkml_store import Client
 import importlib.resources
 import logging
@@ -88,7 +89,6 @@ def process_ontology_nodes(graph, converter) -> (List[dict], List[OntologyClass]
     for node in graph["nodes"]:
         node_id = node.get("id")
         meta = node.get("meta")
-        curie = None
         if "ENVO" in node.get("id"):
             curie = converter.compress(str(node_id))
             if curie is None:
@@ -149,11 +149,35 @@ def insert_ontology_classes_into_db(db, term_dicts):
 @click.command()
 @click.option('--db-url', default='mongodb://localhost:27017', help='MongoDB connection URL')
 @click.option('--db-name', default='nmdc', help='Database name')
-@click.option('--source-ontology-url', default='https://purl.obolibrary.org/obo/envo.json', help='Ontology URL')
-def main(db_url, db_name, source_ontology_url):
-    """Main function to process ontology and store metadata."""
-    # Download the ontology file
-    path = pystow.ensure("tmp", "envo.json", url=source_ontology_url)
+@click.option('--source-ontology', default='envo', help='Lowercase ontology prefix, e.g., envo, go, uberon, etc.')
+def main(db_url, db_name, source_ontology):
+    """Main function to process ontology and store metadata, ensuring the ontology database is available."""
+
+    # Get the ontology-specific pystow directory
+    source_ontology_module = pystow.module(source_ontology).base  # This is ~/.pystow/envo (or another module)
+
+    # If the directory exists, remove it and all its contents
+    if source_ontology_module.exists():
+        print(f"Removing existing pystow directory for {source_ontology}: {source_ontology_module}")
+        shutil.rmtree(source_ontology_module)
+
+    # Define ontology URL
+    ontology_db_url_prefix = 'https://s3.amazonaws.com/bbop-sqlite/'
+    ontology_db_url_suffix = '.db.gz'
+    ontology_url = ontology_db_url_prefix + source_ontology + ontology_db_url_suffix
+
+    # Define paths (download to the module-specific directory)
+    compressed_path = pystow.ensure(source_ontology, f"{source_ontology}.db.gz", url=ontology_url)
+    decompressed_path = compressed_path.with_suffix('')  # Remove .gz to get .db file
+
+    # Extract the file if not already extracted
+    if not decompressed_path.exists():
+        print(f"Extracting {compressed_path} to {decompressed_path}...")
+        with gzip.open(compressed_path, 'rb') as f_in:
+            with open(decompressed_path, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+
+    print(f"Ontology database is ready at: {decompressed_path}")
 
     # Load the ontology graph
     graphdoc = json.load(open(path))
