@@ -15,6 +15,8 @@ from curies import Converter
 from linkml.validator import Validator
 from linkml.validator.plugins import PydanticValidationPlugin
 
+from src.ontology_loader.ontology_processor import OntologyProcessor
+
 validator = Validator(
     schema = str(importlib.resources.files('nmdc_schema').joinpath('nmdc_materialized_patterns.yaml'))
     # ,validation_plugins=[PydanticValidationPlugin()]
@@ -153,53 +155,18 @@ def insert_ontology_classes_into_db(db, term_dicts):
 def main(db_url, db_name, source_ontology):
     """Main function to process ontology and store metadata, ensuring the ontology database is available."""
 
-    # Get the ontology-specific pystow directory
-    source_ontology_module = pystow.module(source_ontology).base  # This is ~/.pystow/envo (or another module)
-
-    # If the directory exists, remove it and all its contents
-    if source_ontology_module.exists():
-        print(f"Removing existing pystow directory for {source_ontology}: {source_ontology_module}")
-        shutil.rmtree(source_ontology_module)
-
-    # Define ontology URL
-    ontology_db_url_prefix = 'https://s3.amazonaws.com/bbop-sqlite/'
-    ontology_db_url_suffix = '.db.gz'
-    ontology_url = ontology_db_url_prefix + source_ontology + ontology_db_url_suffix
-
-    # Define paths (download to the module-specific directory)
-    compressed_path = pystow.ensure(source_ontology, f"{source_ontology}.db.gz", url=ontology_url)
-    decompressed_path = compressed_path.with_suffix('')  # Remove .gz to get .db file
-
-    # Extract the file if not already extracted
-    if not decompressed_path.exists():
-        print(f"Extracting {compressed_path} to {decompressed_path}...")
-        with gzip.open(compressed_path, 'rb') as f_in:
-            with open(decompressed_path, 'wb') as f_out:
-                shutil.copyfileobj(f_in, f_out)
-
-    print(f"Ontology database is ready at: {decompressed_path}")
-
-    # Load the ontology graph
-    graphdoc = json.load(open(path))
-    graph = graphdoc["graphs"][0]
-    print(f"Processing {len(graph['nodes'])} nodes and {len(graph['edges'])} edges...")
-
-    # Initialize the prefix map and converter
-    cmaps = initialize_prefix_map()
-    converter = Converter.from_prefix_map(cmaps, strict=False)
-
-    # Process ontology nodes
-    term_dicts, _ = process_ontology_nodes(graph, converter)
-
+    processor = OntologyProcessor(source_ontology)
+    terms_and_metadata = processor.get_terms_and_metadata()
+    relations_closure = processor.get_relations_closure()
 
     # Connect to the database
-    db_client = connect_to_destination_store()
+    # db_client = connect_to_destination_store()
 
-    # Insert OntologyClass objects into MongoDB using linkml-store
-    insert_ontology_classes_into_db(db_client, term_dicts)
-
-    # Print the completion message
-    print("Processing complete. Data inserted into the database.")
+    # # Insert OntologyClass objects into MongoDB using linkml-store
+    # insert_ontology_classes_into_db(db_client, term_dicts)
+    #
+    # # Print the completion message
+    # print("Processing complete. Data inserted into the database.")
 
 
 if __name__ == "__main__":
