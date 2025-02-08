@@ -1,7 +1,6 @@
 import pystow
 import shutil
 import gzip
-from pathlib import Path
 
 from linkml_runtime.dumpers import json_dumper
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
@@ -93,6 +92,7 @@ class OntologyProcessor:
                         subject=entity,
                         predicate="is_a",  # TODO: fix this to the real predicate that it came with
                         object=ancestor,
+                        type="nmdc:OntologyRelation"
                     )
 
                     # Convert OntologyRelation instance to a dictionary
