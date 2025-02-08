@@ -2,6 +2,9 @@ import pystow
 import shutil
 import gzip
 from pathlib import Path
+
+from linkml_runtime.dumpers import json_dumper
+from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from oaklib import get_adapter
 
 
@@ -50,30 +53,51 @@ class OntologyProcessor:
 
     def get_terms_and_metadata(self):
         """
-        Retrieve all ontology terms that start with 'ENVO:' along with metadata.
+        Retrieve all ontology terms that start with the ontology prefix and return a list of dictionaries
+        conforming to the OntologyClass JSON structure.
         """
+        ontology_classes = []
+
         for entity in self.adapter.entities():
             if entity.startswith(self.ontology.upper() + ":"):
-                print(entity)
-                print(self.adapter.entity_aliases(entity))
-                print(self.adapter.definition(entity))
+                ontology_class = OntologyClass(
+                    id=entity,
+                    type="nmdc:OntologyClass",
+                    alternative_names=self.adapter.entity_aliases(entity) or [],
+                    definition=self.adapter.definition(entity) or "",
+                )
+
+                # Convert OntologyClass instance to a dictionary
+                ontology_classes.append(json_dumper.to_dict(ontology_class))
+
+        return ontology_classes
 
     def get_relations_closure(self, predicates=None):
         """
-        Retrieve all ontology relations closure for terms starting with 'ENVO:'.
-        Defaults to 'rdfs:subClassOf' and 'BFO:0000050'.
+        Retrieve all ontology relations closure for terms starting with the ontology prefix
+        and return a list of dictionaries conforming to the OntologyRelation JSON structure.
         """
         predicates = ["rdfs:subClassOf", "BFO:0000050"] if predicates is None else predicates
+        ontology_relations = []
 
         for entity in self.adapter.entities():
-            if entity.startswith("ENVO:"):
+            if entity.startswith(self.ontology.upper() + ":"):
                 # Convert generator to list
                 ancestors_list = list(self.adapter.ancestors(entity, reflexive=True, predicates=predicates))
 
                 # Filter to keep only ENVO terms
-                filtered_ancestors = list(set(a for a in ancestors_list if a.startswith("ENVO:")))
+                filtered_ancestors = list(set(a for a in ancestors_list if a.startswith(self.ontology.upper() + ":")))
 
-                if filtered_ancestors:  # Print only if the list is non-empty
-                    print(f"{entity} -> {filtered_ancestors}")
+                for ancestor in filtered_ancestors:
+                    ontology_relation = OntologyRelation(
+                        subject=entity,
+                        predicate="is_a",  # TODO: fix this to the real predicate that it came with
+                        object=ancestor,
+                    )
+
+                    # Convert OntologyRelation instance to a dictionary
+                    ontology_relations.append(json_dumper.to_dict(ontology_relation))
+
+        return ontology_relations
 
 
