@@ -9,7 +9,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 pymongo = "^4.9.1"
-nmdc-schema = { git = "https://github.com/microbiomedata/nmdc-schema", branch = "ontology_metadata" }
+nmdc-schema = "*"
 oaklib = "^0.6.16"
 click = "^8.1.7"
 curies = "^0.8.0"
