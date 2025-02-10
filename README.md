@@ -32,6 +32,6 @@ up-to-date using [cruft](https://cruft.github.io/cruft/).
 ```bash
 % poetry install
 % poetry run ontology_loader --help
-% poetry run ontology_loader --source-ontology-url "https://purl.obolibrary.org/obo/envo.json"
-% poetry run ontology_loader --source-ontology-url "https://purl.obolibrary.org/obo/go.json"
+% poetry run ontology_loader --source-ontology "envo"
+% poetry run ontology_loader --source-ontology "go"
 ```

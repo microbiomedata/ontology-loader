@@ -4,6 +4,7 @@ from src.ontology_loader.ontology_processor import OntologyProcessor
 from src.ontology_loader.mongodb_loader import MongoDBLoader
 from linkml_runtime import SchemaView
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+from utils import load_yaml_from_package
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -18,7 +19,7 @@ def main(db_url, db_name, source_ontology):
     """
 
     logging.info(f"Processing ontology: {source_ontology}")
-
+    nmdc_sv = load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
     # Initialize the Ontology Processor
     processor = OntologyProcessor(source_ontology)
 
@@ -33,8 +34,8 @@ def main(db_url, db_name, source_ontology):
     logging.info(f"Extracted {len(ontology_relations)} ontology relations.")
 
     # Connect to MongoDB
-    schema_view = SchemaView("nmdc_materialized_patterns.yaml")
-    db_manager = MongoDBLoader(schema_view)
+    nmdc_sv
+    db_manager = MongoDBLoader(nmdc_sv)
 
     # Insert data into MongoDB
     db_manager.insert_ontology_classes(ontology_classes)
