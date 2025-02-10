@@ -29,6 +29,8 @@ class MongoDBLoader:
         :param ontology_classes: A list of OntologyClass objects to upsert.
         """
         collection = self.db.create_collection("ontology_class_set", recreate_if_exists=False)
+        # Ensure an index on the 'id' field for efficient lookups
+        collection.index("id", unique=True)
 
         if not ontology_classes:
             logging.info("No OntologyClass objects to upsert.")
