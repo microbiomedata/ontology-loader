@@ -32,11 +32,10 @@ def main(db_url, db_name, source_ontology):
     logging.info(f"Extracted {len(ontology_relations)} ontology relations.")
 
     # Connect to MongoDB
-    nmdc_sv
     db_manager = MongoDBLoader(nmdc_sv)
 
     # Insert data into MongoDB
-    db_manager.insert_ontology_classes(ontology_classes)
+    db_manager.upsert_ontology_classes(ontology_classes)
     db_manager.insert_ontology_relations(ontology_relations)
 
     logging.info("Processing complete. Data inserted into MongoDB.")
