@@ -15,7 +15,7 @@ class MongoDBLoader:
         self.client = Client()
         self.db = self.client.attach_database("mongodb", alias="nmdc", schema_view=schema_view)
 
-    def insert_ontology_classes(self, ontology_classes):
+    def upsert_ontology_classes(self, ontology_classes):
         """
         Insert each OntologyClass object into the 'ontology_class_set' collection.
 
@@ -24,12 +24,12 @@ class MongoDBLoader:
         collection = self.db.create_collection("ontology_class_set", recreate_if_exists=True)
 
         if ontology_classes:
-            collection.insert(ontology_classes)
+            collection.upsert(ontology_classes)
             logging.info(f"Inserted {len(ontology_classes)} OntologyClass objects into MongoDB.")
         else:
             logging.info("No OntologyClass objects to insert.")
 
-    def insert_ontology_relations(self, ontology_relations):
+    def upsert_ontology_relations(self, ontology_relations):
         """
         Insert each OntologyClass object into the 'ontology_class_set' collection.
 
@@ -38,7 +38,7 @@ class MongoDBLoader:
         collection = self.db.create_collection("ontology_relation_set", recreate_if_exists=True)
 
         if ontology_relations:
-            collection.insert(ontology_relations)
+            collection.upsert(ontology_relations)
             logging.info(f"Inserted {len(ontology_relations)} OntologyRelations objects into MongoDB.")
         else:
             logging.info("No OntologyRelation objects to insert.")
