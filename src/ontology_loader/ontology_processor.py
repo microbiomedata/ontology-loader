@@ -52,8 +52,7 @@ class OntologyProcessor:
 
     def get_terms_and_metadata(self):
         """
-        Retrieve all ontology terms that start with the ontology prefix and return a list of dictionaries
-        conforming to the OntologyClass JSON structure.
+        Retrieve all ontology terms that start with the ontology prefix and return a list of OntologyClass objects.
         """
         ontology_classes = []
 
@@ -66,8 +65,7 @@ class OntologyProcessor:
                     definition=self.adapter.definition(entity) or "",
                 )
 
-                # Convert OntologyClass instance to a dictionary
-                ontology_classes.append(json_dumper.to_dict(ontology_class))
+                ontology_classes.append(ontology_class)
 
         return ontology_classes
 
