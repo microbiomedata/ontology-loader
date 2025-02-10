@@ -2,8 +2,6 @@ import click
 import logging
 from src.ontology_loader.ontology_processor import OntologyProcessor
 from src.ontology_loader.mongodb_loader import MongoDBLoader
-from linkml_runtime import SchemaView
-from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from utils import load_yaml_from_package
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
