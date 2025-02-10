@@ -3,7 +3,7 @@ from typing import List
 
 from linkml_store import Client
 from linkml_runtime import SchemaView
-from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+from nmdc_schema.nmdc import OntologyClass
 import logging
 import csv
 from pathlib import Path
