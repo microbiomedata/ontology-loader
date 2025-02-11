@@ -21,14 +21,15 @@ class MongoDBLoader:
         self.client = Client()
         self.db = self.client.attach_database("mongodb", alias="nmdc", schema_view=schema_view)
 
-    def upsert_ontology_classes(self, ontology_classes: List[OntologyClass]):
+    def upsert_ontology_classes(self, ontology_classes: List[OntologyClass], collection_name: str="ontology_class_set"):
         """
         Upsert each OntologyClass object into the 'ontology_class_set' collection
         and generate dynamic TSV reports based on detected updates.
 
         :param ontology_classes: A list of OntologyClass objects to upsert.
+        :param collection_name: The name of the MongoDB collection to upsert into.
         """
-        collection = self.db.create_collection("ontology_class_set", recreate_if_exists=False)
+        collection = self.db.create_collection(collection_name, recreate_if_exists=False)
         # Ensure an index on the 'id' field for efficient lookups
         collection.index("id", unique=False)
 
@@ -44,11 +45,7 @@ class MongoDBLoader:
 
         for obj in ontology_classes:
             filter_criteria = {"id": obj.id}
-
-            # Query the collection using LinkML-store Client wrapper
             query_result = collection.find(filter_criteria)
-
-            # Extract the first document from QueryResult.rows
             existing_doc = query_result.rows[0] if query_result.num_rows > 0 else None
 
             if existing_doc:
@@ -93,16 +90,18 @@ class MongoDBLoader:
 
         logging.info(f"Reports generated: {updates_report_path}, {insertions_report_path}")
 
-    def insert_ontology_relations(self, ontology_relations):
+    def insert_ontology_relations(self, ontology_relations, collection_name: str="ontology_relation_set"):
         """
         Insert each OntologyClass object into the 'ontology_class_set' collection.
 
-        :param ontology_relations: A list of OntologyClass objects to insert
+        :param ontology_relations: A list of OntologyRelation objects to insert
+        :param collection_name: The name of the MongoDB collection to insert into.
         """
-        collection = self.db.create_collection("ontology_relation_set", recreate_if_exists=False)
+        collection = self.db.create_collection(collection_name, recreate_if_exists=False)
 
         if ontology_relations:
-            collection.insert(ontology_relations)
+            for relation in ontology_relations:
+                collection.insert(asdict(relation))
             logging.info(f"Inserted {len(ontology_relations)} OntologyRelations objects into MongoDB.")
         else:
             logging.info("No OntologyRelation objects to insert.")

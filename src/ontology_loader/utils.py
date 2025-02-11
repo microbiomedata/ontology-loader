@@ -1,5 +1,4 @@
 import importlib.resources
-import yaml  # Ensure PyYAML is installed
 from linkml_runtime.utils.schemaview import SchemaView
 
 def load_yaml_from_package(package: str, filename: str) -> SchemaView:
