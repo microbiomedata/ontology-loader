@@ -5,7 +5,6 @@ SHELL := bash
 .DELETE_ON_ERROR:
 .SUFFIXES:
 .SECONDARY:
-
 RUN = poetry run
 
 help: status
@@ -20,11 +19,14 @@ install:
 	poetry install
 .PHONY: install
 
-deploy:
+deploy-gh-doc:
+	$(RUN) mkdocs gh-deploy
 
 test:
+	$(RUN) pytest tests
 
 lint:
+	$(RUN) tox -e lint-fix
 
 MKDOCS = $(RUN) mkdocs
 
@@ -36,4 +38,3 @@ serve: mkd-serve
 
 testdoc: serve
 
-include project.Makefile
