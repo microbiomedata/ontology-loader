@@ -21,7 +21,9 @@ class MongoDBLoader:
         self.client = Client()
         self.db = self.client.attach_database("mongodb", alias="nmdc", schema_view=schema_view)
 
-    def upsert_ontology_classes(self, ontology_classes: List[OntologyClass], collection_name: str="ontology_class_set"):
+    def upsert_ontology_classes(
+        self, ontology_classes: List[OntologyClass], collection_name: str = "ontology_class_set"
+    ):
         """
         Upsert each OntologyClass object into the 'ontology_class_set' collection
         and generate dynamic TSV reports based on detected updates.
@@ -51,14 +53,11 @@ class MongoDBLoader:
             if existing_doc:
                 # Identify fields that have changed
                 updated_fields = {
-                    key: getattr(obj, key) for key in ontology_fields
-                    if getattr(obj, key) != existing_doc.get(key)
+                    key: getattr(obj, key) for key in ontology_fields if getattr(obj, key) != existing_doc.get(key)
                 }
 
                 if updated_fields:
-                    collection.upsert(
-                        [asdict(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys())
-                    )
+                    collection.upsert([asdict(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys()))
                     logging.debug(f"Updated existing OntologyClass (id={obj.id}): {updated_fields}")
 
                     # Add to updates report
@@ -90,7 +89,7 @@ class MongoDBLoader:
 
         logging.info(f"Reports generated: {updates_report_path}, {insertions_report_path}")
 
-    def insert_ontology_relations(self, ontology_relations, collection_name: str="ontology_relation_set"):
+    def insert_ontology_relations(self, ontology_relations, collection_name: str = "ontology_relation_set"):
         """
         Insert each OntologyClass object into the 'ontology_class_set' collection.
 

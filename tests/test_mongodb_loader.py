@@ -6,9 +6,11 @@ from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from src.ontology_loader.mongodb_loader import MongoDBLoader
 from src.ontology_loader.utils import load_yaml_from_package
 
+
 @pytest.fixture()
 def schema_view():
     return load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
+
 
 def test_mongodb_loader_init(schema_view):
     """Test MongoDBLoader initialization and cleanup."""
@@ -24,7 +26,7 @@ def test_upsert_ontology_classes(schema_view):
 
     ontology_classes = [
         OntologyClass(id="nmdc:NC1", type="nmdc:OntologyClass"),
-        OntologyClass(id="nmdc:NC2", type="nmdc:OntologyClass")
+        OntologyClass(id="nmdc:NC2", type="nmdc:OntologyClass"),
     ]
 
     # creating this collection here, effectively wipes out any previous test data.
@@ -46,13 +48,14 @@ def test_upsert_ontology_classes(schema_view):
     assert "nmdc:NC1" in ids
     assert "nmdc:NC2" in ids
 
+
 def test_insert_ontology_relations(schema_view):
     """Test inserting ontology relations."""
     loader = MongoDBLoader(schema_view)
 
     ontology_relations = [
         OntologyRelation(subject="nmdc:NC1", predicate="nmdc:is_a", object="nmdc:NC2", type="nmdc:OntologyRelation"),
-        OntologyRelation(subject="nmdc:NC2", predicate="nmdc:is_a", object="nmdc:NC3", type="nmdc:OntologyRelation")
+        OntologyRelation(subject="nmdc:NC2", predicate="nmdc:is_a", object="nmdc:NC3", type="nmdc:OntologyRelation"),
     ]
     # creating this collection here, effectively wipes out any previous test data.
     collection = loader.db.create_collection("test_collection", recreate_if_exists=True)
@@ -65,7 +68,7 @@ def test_insert_ontology_relations(schema_view):
     # Expected records
     expected_records = [
         {"subject": "nmdc:NC1", "predicate": "nmdc:is_a", "object": "nmdc:NC2", "type": "nmdc:OntologyRelation"},
-        {"subject": "nmdc:NC2", "predicate": "nmdc:is_a", "object": "nmdc:NC3", "type": "nmdc:OntologyRelation"}
+        {"subject": "nmdc:NC2", "predicate": "nmdc:is_a", "object": "nmdc:NC3", "type": "nmdc:OntologyRelation"},
     ]
 
     for expected_record in expected_records:

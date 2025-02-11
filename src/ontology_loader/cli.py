@@ -8,9 +8,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 @click.command()
-@click.option('--db-url', default='mongodb://localhost:27017', help='MongoDB connection URL')
-@click.option('--db-name', default='nmdc', help='Database name')
-@click.option('--source-ontology', default='envo', help='Lowercase ontology prefix, e.g., envo, go, uberon, etc.')
+@click.option("--db-url", default="mongodb://localhost:27017", help="MongoDB connection URL")
+@click.option("--db-name", default="nmdc", help="Database name")
+@click.option("--source-ontology", default="envo", help="Lowercase ontology prefix, e.g., envo, go, uberon, etc.")
 def main(db_url, db_name, source_ontology):
     """
     Main function to process ontology and store metadata, ensuring the ontology database is available.

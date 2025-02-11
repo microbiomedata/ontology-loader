@@ -1,6 +1,7 @@
 import importlib.resources
 from linkml_runtime.utils.schemaview import SchemaView
 
+
 def load_yaml_from_package(package: str, filename: str) -> SchemaView:
     """
     Loads a YAML file from a given package.

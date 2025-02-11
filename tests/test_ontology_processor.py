@@ -1,6 +1,7 @@
 from src.ontology_loader.ontology_processor import OntologyProcessor
 from nmdc_schema.nmdc import OntologyClass
 
+
 def test_ontology_processor():
     """Test OntologyProcessor initialization and ontology retrieval."""
     ontology_name = "envo"

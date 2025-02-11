@@ -32,19 +32,19 @@ class OntologyProcessor:
             shutil.rmtree(source_ontology_module)
 
         # Define ontology URL
-        ontology_db_url_prefix = 'https://s3.amazonaws.com/bbop-sqlite/'
-        ontology_db_url_suffix = '.db.gz'
+        ontology_db_url_prefix = "https://s3.amazonaws.com/bbop-sqlite/"
+        ontology_db_url_suffix = ".db.gz"
         ontology_url = ontology_db_url_prefix + self.ontology + ontology_db_url_suffix
 
         # Define paths (download to the module-specific directory)
         compressed_path = pystow.ensure(self.ontology, f"{self.ontology}.db.gz", url=ontology_url)
-        decompressed_path = compressed_path.with_suffix('')  # Remove .gz to get .db file
+        decompressed_path = compressed_path.with_suffix("")  # Remove .gz to get .db file
 
         # Extract the file if not already extracted
         if not decompressed_path.exists():
             print(f"Extracting {compressed_path} to {decompressed_path}...")
-            with gzip.open(compressed_path, 'rb') as f_in:
-                with open(decompressed_path, 'wb') as f_out:
+            with gzip.open(compressed_path, "rb") as f_in:
+                with open(decompressed_path, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
 
         print(f"Ontology database is ready at: {decompressed_path}")
@@ -90,12 +90,10 @@ class OntologyProcessor:
                         subject=entity,
                         predicate="is_a",  # TODO: fix this to the real predicate that it came with
                         object=ancestor,
-                        type="nmdc:OntologyRelation"
+                        type="nmdc:OntologyRelation",
                     )
 
                     # Convert OntologyRelation instance to a dictionary
                     ontology_relations.append(json_dumper.to_dict(ontology_relation))
 
         return ontology_relations
-
-
