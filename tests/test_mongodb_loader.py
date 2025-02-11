@@ -1,14 +1,17 @@
-import csv
+"""Test the MongoDBLoader class."""
+
 from pathlib import Path
 
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+
 from src.ontology_loader.mongodb_loader import MongoDBLoader
 from src.ontology_loader.utils import load_yaml_from_package
 
 
 @pytest.fixture()
 def schema_view():
+    """Load the NMDC schema view."""
     return load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
 
 

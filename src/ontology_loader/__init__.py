@@ -1,4 +1,6 @@
-from importlib.metadata import version, PackageNotFoundError
+"""Ontology Loader package."""
+
+from importlib.metadata import PackageNotFoundError, version
 
 try:
     __version__ = version("ontology-loader")

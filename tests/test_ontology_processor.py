@@ -1,5 +1,6 @@
+"""Test OntologyProcessor class and its methods."""
+
 from src.ontology_loader.ontology_processor import OntologyProcessor
-from nmdc_schema.nmdc import OntologyClass
 
 
 def test_ontology_processor():
@@ -17,7 +18,9 @@ def test_get_terms_and_metadata():
     ontology_classes = processor.get_terms_and_metadata()
 
     assert isinstance(ontology_classes, list)
-    assert all(isinstance(cls, OntologyClass) for cls in ontology_classes)
+    for ontology_class in ontology_classes:
+        assert "id" in ontology_class and "type" in ontology_class
+        assert ontology_class["type"] == "nmdc:OntologyClass"
 
 
 def test_get_relations_closure():
@@ -27,4 +30,7 @@ def test_get_relations_closure():
 
     assert isinstance(ontology_relations, list)
     assert all(isinstance(rel, dict) for rel in ontology_relations)
-    assert all("subject" in rel and "predicate" in rel and "object" in rel for rel in ontology_relations)
+    for rel in ontology_relations:
+        assert "subject" in rel
+        assert "predicate" in rel
+        assert "object" in rel

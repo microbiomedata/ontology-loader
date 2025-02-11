@@ -1,8 +1,12 @@
-import click
+"""Cli methods for ontology loading from the command line."""
+
 import logging
-from src.ontology_loader.ontology_processor import OntologyProcessor
-from src.ontology_loader.mongodb_loader import MongoDBLoader
+
+import click
 from utils import load_yaml_from_package
+
+from src.ontology_loader.mongodb_loader import MongoDBLoader
+from src.ontology_loader.ontology_processor import OntologyProcessor
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -13,9 +17,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 @click.option("--source-ontology", default="envo", help="Lowercase ontology prefix, e.g., envo, go, uberon, etc.")
 def main(db_url, db_name, source_ontology):
     """
-    Main function to process ontology and store metadata, ensuring the ontology database is available.
-    """
+    Cli entry point for the ontology loader.
 
+    :param db_url: MongoDB connection URL (optional)
+    :param db_name: Database name (optional)
+    :param source_ontology: Lowercase ontology prefix, e.g., envo, go, uberon, etc. (required)
+    """
     logging.info(f"Processing ontology: {source_ontology}")
     nmdc_sv = load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
     # Initialize the Ontology Processor

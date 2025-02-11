@@ -1,22 +1,28 @@
+"""Load and process ontology terms and relations into MongoDB."""
+
+import csv
+import logging
 from dataclasses import asdict, fields
+from pathlib import Path
 from typing import List
 
-from linkml_store import Client
 from linkml_runtime import SchemaView
+from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass
-import logging
-import csv
-from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 class MongoDBLoader:
+
+    """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
+
     def __init__(self, schema_view: SchemaView):
         """
         Initialize MongoDB using LinkML-store's client.
 
         :param schema_view: LinkML SchemaView for ontology
+
         """
         self.client = Client()
         self.db = self.client.attach_database("mongodb", alias="nmdc", schema_view=schema_view)
@@ -25,11 +31,11 @@ class MongoDBLoader:
         self, ontology_classes: List[OntologyClass], collection_name: str = "ontology_class_set"
     ):
         """
-        Upsert each OntologyClass object into the 'ontology_class_set' collection
-        and generate dynamic TSV reports based on detected updates.
+        Upsert each OntologyClass object into the 'ontology_class_set' collection and reports based on detected updates.
 
         :param ontology_classes: A list of OntologyClass objects to upsert.
         :param collection_name: The name of the MongoDB collection to upsert into.
+
         """
         collection = self.db.create_collection(collection_name, recreate_if_exists=False)
         # Ensure an index on the 'id' field for efficient lookups
@@ -95,6 +101,7 @@ class MongoDBLoader:
 
         :param ontology_relations: A list of OntologyRelation objects to insert
         :param collection_name: The name of the MongoDB collection to insert into.
+
         """
         collection = self.db.create_collection(collection_name, recreate_if_exists=False)
 
