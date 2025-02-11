@@ -1,17 +1,18 @@
 ## ontology_loader
 
-Suite of tools to configure and load an ontology from the OboFoundary into the data object for OntologyClass as specified by NMDC schema
-
-## Acknowledgements
-
-This [cookiecutter](https://cookiecutter.readthedocs.io/en/stable/README.html) project was developed from the 
-[nmdc-project-template](https://github.com/sierra-moxon/nmdc-project-template) template and will be kept 
-up-to-date using [cruft](https://cruft.github.io/cruft/).
-
+Suite of tools to configure and load an ontology from the OboFoundary into the data object for OntologyClass as 
+specified by NMDC schema.
 
 ## Development Environment
 
 #### Pre-requisites
+
+- >=Python 3.8
+- Poetry
+- Docker
+- MongoDB
+- NMDC materialized schema
+
 ```bash
 
 % docker pull mongo
@@ -26,6 +27,7 @@ up-to-date using [cruft](https://cruft.github.io/cruft/).
 % show dbs
 % use test
 % db.ontology_class_set.find().pretty()
+% db.ontology_relation_set.find().pretty()
 ``` 
 
 #### Command line
