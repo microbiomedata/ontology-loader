@@ -1,0 +1,24 @@
+{
+  "template": "https://github.com/sierra-moxon/nmdc-project-template",
+  "commit": "7c0b71e7055af009dc79c890e53f601102a2454d",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "project_name": "ontology_loader",
+      "github_org_name": "sierra-moxon",
+      "__project_slug": "ontology_loader",
+      "project_description": "Suite of tools to configure and load an ontology from the OboFoundary into the data object for OntologyClass as specified by NMDC schema",
+      "min_python_version": "3.11",
+      "file_name": "main",
+      "greeting_recipient": "World",
+      "full_name": "Author 1",
+      "email": "smoxon@lbl.gov",
+      "__author": "Author 1 <smoxon@lbl.gov>",
+      "license": "MIT",
+      "github_token_for_doc_deployment": "GH_TOKEN",
+      "github_token_for_pypi_deployment": "PYPI_TOKEN",
+      "_template": "https://github.com/sierra-moxon/nmdc-project-template"
+    }
+  },
+  "directory": null
+}
