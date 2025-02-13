@@ -4,28 +4,47 @@ import csv
 import logging
 from dataclasses import asdict, fields
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from linkml_runtime import SchemaView
 from linkml_store import Client
+from linkml_store.api.stores.mongodb.mongodb_database import MongoDBDatabase
 from nmdc_schema.nmdc import OntologyClass
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 class MongoDBLoader:
-
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
-    def __init__(self, schema_view: SchemaView):
+    def __init__(self,
+                 schema_view: Optional[SchemaView] = None,
+                 db_host: str = "localhost",
+                 db_port: int = 27018,
+                 db_name: str = "nmdc",
+                 db_user: str = "admin",
+                 db_password: str = "root"):
         """
         Initialize MongoDB using LinkML-store's client.
 
         :param schema_view: LinkML SchemaView for ontology
-
+        :param db_host: MongoDB host (default: "localhost")
+        :param db_port: MongoDB port (default: 27017)
+        :param db_name: MongoDB database name (default: "nmdc")
+        :param db_user: MongoDB username (default: "admin")
+        :param db_password: MongoDB password (default: "root")
         """
-        self.client = Client()
-        self.db = self.client.attach_database("mongodb", alias="nmdc", schema_view=schema_view)
+        self.schema_view = schema_view
+        self.db_host = db_host
+        self.db_port = db_port
+        self.db_name = db_name
+        self.db_user = db_user
+        self.db_password = db_password
+
+        self.handle = f"mongodb://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?authSource=admin"
+        print(self.handle)
+        self.client = Client(handle=self.handle)
+        self.db = self.client.attach_database(handle=self.handle, alias=db_name, schema_view=schema_view)
 
     def upsert_ontology_classes(
         self, ontology_classes: List[OntologyClass], collection_name: str = "ontology_class_set"
@@ -107,7 +126,11 @@ class MongoDBLoader:
 
         if ontology_relations:
             for relation in ontology_relations:
-                collection.insert(asdict(relation))
-            logging.info(f"Inserted {len(ontology_relations)} OntologyRelations objects into MongoDB.")
+                if not isinstance(relation, dict):  # Ensure it's a dataclass
+                    collection.insert(asdict(relation))
+                elif isinstance(relation, dict):  # Already a dictionary, insert directly
+                    collection.insert(relation)
+                else:
+                    raise TypeError(f"Unexpected type for relation: {type(relation)}")
         else:
             logging.info("No OntologyRelation objects to insert.")

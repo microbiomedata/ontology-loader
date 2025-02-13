@@ -7,7 +7,7 @@ specified by NMDC schema.
 
 #### Pre-requisites
 
-- \>=Python 3.9
+- >=Python 3.8
 - Poetry
 - Docker
 - MongoDB
