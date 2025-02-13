@@ -8,22 +8,24 @@ from typing import List, Optional
 
 from linkml_runtime import SchemaView
 from linkml_store import Client
-from linkml_store.api.stores.mongodb.mongodb_database import MongoDBDatabase
 from nmdc_schema.nmdc import OntologyClass
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 class MongoDBLoader:
+
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
-    def __init__(self,
-                 schema_view: Optional[SchemaView] = None,
-                 db_host: str = "localhost",
-                 db_port: int = 27018,
-                 db_name: str = "nmdc",
-                 db_user: str = "admin",
-                 db_password: str = "root"):
+    def __init__(
+        self,
+        schema_view: Optional[SchemaView] = None,
+        db_host: str = "localhost",
+        db_port: int = 27018,
+        db_name: str = "nmdc",
+        db_user: str = "admin",
+        db_password: str = "",
+    ):
         """
         Initialize MongoDB using LinkML-store's client.
 

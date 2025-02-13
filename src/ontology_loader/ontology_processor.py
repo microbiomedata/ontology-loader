@@ -3,6 +3,7 @@
 import gzip
 import logging
 import shutil
+
 import pystow
 from linkml_runtime.dumpers import json_dumper
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
