@@ -5,7 +5,7 @@ import os
 
 import click
 from utils import load_yaml_from_package
-
+from src.ontology_loader.ontology_report import ReportWriter
 from src.ontology_loader.mongodb_loader import MongoDBLoader
 from src.ontology_loader.ontology_processor import OntologyProcessor
 
@@ -45,10 +45,15 @@ def main(db_host, db_port, db_name, db_user, db_password, source_ontology):
     )
 
     # Insert data into MongoDB
-    db_manager.upsert_ontology_classes(ontology_classes)
+    # Insert data into MongoDB
+    updates_report, insertions_report = db_manager.upsert_ontology_classes(ontology_classes)
     db_manager.insert_ontology_relations(ontology_relations)
 
-    logging.info("Processing complete. Data inserted into MongoDB.")
+    # Write reports
+    ReportWriter.write_reports([updates_report, insertions_report])
+    db_manager.insert_ontology_relations(ontology_relations)
+
+    logger.info("Processing complete. Data inserted into MongoDB.")
 
 
 if __name__ == "__main__":
