@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ontology_loader"
-version = "0.0.0.post4.dev0+aaeb412"
+version = "0.0.0"
 description = "ontology_loader"
 authors = ["Author 1 <smoxon@lbl.gov>"]
 license = "MIT"
