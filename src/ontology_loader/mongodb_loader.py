@@ -1,5 +1,6 @@
 """Load and process ontology terms and relations into MongoDB."""
 
+import os
 import csv
 import logging
 from dataclasses import asdict, fields
@@ -11,30 +12,30 @@ from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 class MongoDBLoader:
-
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
     def __init__(
         self,
         schema_view: Optional[SchemaView] = None,
-        db_host: str = "localhost",
-        db_port: int = 27018,
-        db_name: str = "nmdc",
-        db_user: str = "admin",
-        db_password: str = "",
+        db_host: str = os.getenv("MONGO_HOST", "localhost"),
+        db_port: int = int(os.getenv("MONGO_PORT", 27018)),
+        db_name: str = os.getenv("MONGO_DBNAME", "nmdc"),
+        db_user: str = os.getenv("MONGO_USERNAME", "admin"),
+        db_password: str = os.getenv("MONGO_PASSWORD", ""),
     ):
         """
         Initialize MongoDB using LinkML-store's client.
 
         :param schema_view: LinkML SchemaView for ontology
-        :param db_host: MongoDB host (default: "localhost")
-        :param db_port: MongoDB port (default: 27017)
-        :param db_name: MongoDB database name (default: "nmdc")
-        :param db_user: MongoDB username (default: "admin")
-        :param db_password: MongoDB password (default: "root")
+        :param db_host: MongoDB host (default: "localhost" or environment variable MONGO_HOST)
+        :param db_port: MongoDB port (default: 27017 or environment variable MONGO_PORT)
+        :param db_name: MongoDB database name (default: "nmdc" or environment variable MONGO_DB)
+        :param db_user: MongoDB username (default: "admin" or environment variable MONGO_USER)
+        :param db_password: MongoDB password (default: "root" or environment variable MONGO_PASSWORD)
         """
         self.schema_view = schema_view
         self.db_host = db_host
@@ -43,8 +44,17 @@ class MongoDBLoader:
         self.db_user = db_user
         self.db_password = db_password
 
+        # TODO: it might be that we are providing the connection string "incorrectly" (or differently) in linkml-store
+        # this exists so that the default env parameters in nmdc-runtime can be used as they are currently
+        # specified.
+        if db_host.startswith("mongodb://"):
+            # mongodb://mongo:27017
+            db_host = db_host.replace("mongodb://", "")
+            db_port = int(db_host.split(":")[1])
+            db_host = db_host.split(":")[0]
+
         self.handle = f"mongodb://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?authSource=admin"
-        print(self.handle)
+        logger.info(self.handle)
         self.client = Client(handle=self.handle)
         self.db = self.client.attach_database(handle=self.handle, alias=db_name, schema_view=schema_view)
 
@@ -63,7 +73,7 @@ class MongoDBLoader:
         collection.index("id", unique=False)
 
         if not ontology_classes:
-            logging.info("No OntologyClass objects to upsert.")
+            logger.info("No OntologyClass objects to upsert.")
             return
 
         updates_report = []
@@ -85,21 +95,21 @@ class MongoDBLoader:
 
                 if updated_fields:
                     collection.upsert([asdict(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys()))
-                    logging.debug(f"Updated existing OntologyClass (id={obj.id}): {updated_fields}")
+                    logger.debug(f"Updated existing OntologyClass (id={obj.id}): {updated_fields}")
 
                     # Add to updates report
                     updates_report.append([obj.id] + [getattr(obj, field, "") for field in ontology_fields])
                 else:
-                    logging.debug(f"No changes detected for OntologyClass (id={obj.id}). Skipping update.")
+                    logger.debug(f"No changes detected for OntologyClass (id={obj.id}). Skipping update.")
             else:
                 # New insert
                 collection.upsert([asdict(obj)], filter_fields=["id"], update_fields=ontology_fields)
-                logging.debug(f"Inserted new OntologyClass (id={obj.id}).")
+                logger.debug(f"Inserted new OntologyClass (id={obj.id}).")
 
                 # Add to insertions report
                 insertions_report.append([obj.id] + [getattr(obj, field, "") for field in ontology_fields])
 
-        logging.info(f"Finished upserting {len(ontology_classes)} OntologyClass objects into MongoDB.")
+        logger.info(f"Finished upserting {len(ontology_classes)} OntologyClass objects into MongoDB.")
 
         # Reporting changes
         updates_report_path = Path("ontology_updates.tsv")
@@ -114,7 +124,7 @@ class MongoDBLoader:
             writer.writerow(["id"] + ontology_fields)  # Dynamic header
             writer.writerows(insertions_report)
 
-        logging.info(f"Reports generated: {updates_report_path}, {insertions_report_path}")
+        logger.info(f"Reports generated: {updates_report_path}, {insertions_report_path}")
 
     def insert_ontology_relations(self, ontology_relations, collection_name: str = "ontology_relation_set"):
         """
@@ -135,4 +145,4 @@ class MongoDBLoader:
                 else:
                     raise TypeError(f"Unexpected type for relation: {type(relation)}")
         else:
-            logging.info("No OntologyRelation objects to insert.")
+            logger.info("No OntologyRelation objects to insert.")

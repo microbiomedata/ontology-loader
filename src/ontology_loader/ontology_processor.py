@@ -9,6 +9,9 @@ from linkml_runtime.dumpers import json_dumper
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from oaklib import get_adapter
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
 
 class OntologyProcessor:
 
@@ -28,14 +31,14 @@ class OntologyProcessor:
 
     def download_and_prepare_ontology(self):
         """Download and prepare the ontology database for processing."""
-        logging.info(f"Preparing ontology: {self.ontology}")
+        logger.info(f"Preparing ontology: {self.ontology}")
 
         # Get the ontology-specific pystow directory
         source_ontology_module = pystow.module(self.ontology).base  # Example: ~/.pystow/envo
 
         # If the directory exists, remove it and all its contents
         if source_ontology_module.exists():
-            logging.info(f"Removing existing pystow directory for {self.ontology}: {source_ontology_module}")
+            logger.info(f"Removing existing pystow directory for {self.ontology}: {source_ontology_module}")
             shutil.rmtree(source_ontology_module)
 
         # Define ontology URL
@@ -49,12 +52,12 @@ class OntologyProcessor:
 
         # Extract the file if not already extracted
         if not decompressed_path.exists():
-            logging.info(f"Extracting {compressed_path} to {decompressed_path}...")
+            logger.info(f"Extracting {compressed_path} to {decompressed_path}...")
             with gzip.open(compressed_path, "rb") as f_in:
                 with open(decompressed_path, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
 
-        logging.info(f"Ontology database is ready at: {decompressed_path}")
+        logger.info(f"Ontology database is ready at: {decompressed_path}")
         return decompressed_path
 
     def get_terms_and_metadata(self):
