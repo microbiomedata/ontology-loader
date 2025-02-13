@@ -2,6 +2,7 @@
 
 import logging
 import os
+
 import click
 from utils import load_yaml_from_package
 
@@ -20,9 +21,7 @@ logger = logging.getLogger(__name__)
 @click.option("--db-password", default=os.getenv("MONGO_PASSWORD", ""), help="Database password")
 @click.option("--source-ontology", default="envo", help="Lowercase ontology prefix, e.g., envo, go, uberon, etc.")
 def main(db_host, db_port, db_name, db_user, db_password, source_ontology):
-    """
-    CLI entry point for the ontology loader.
-    """
+    """CLI entry point for the ontology loader."""
     logging.info(f"Processing ontology: {source_ontology}")
 
     # Load Schema View
@@ -42,12 +41,7 @@ def main(db_host, db_port, db_name, db_user, db_password, source_ontology):
 
     # Connect to MongoDB
     db_manager = MongoDBLoader(
-        schema_view=nmdc_sv,
-        db_host=db_host,
-        db_port=db_port,
-        db_name=db_name,
-        db_user=db_user,
-        db_password=db_password
+        schema_view=nmdc_sv, db_host=db_host, db_port=db_port, db_name=db_name, db_user=db_user, db_password=db_password
     )
 
     # Insert data into MongoDB

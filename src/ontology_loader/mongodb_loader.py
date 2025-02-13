@@ -1,8 +1,8 @@
 """Load and process ontology terms and relations into MongoDB."""
 
-import os
 import csv
 import logging
+import os
 from dataclasses import asdict, fields
 from pathlib import Path
 from typing import List, Optional
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class MongoDBLoader:
+
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
     def __init__(
