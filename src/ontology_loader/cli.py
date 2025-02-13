@@ -2,13 +2,9 @@
 
 import logging
 import os
-
 import click
-from utils import load_yaml_from_package
-
 from src.ontology_loader.mongodb_loader import MongoDBLoader
-from src.ontology_loader.ontology_processor import OntologyProcessor
-from src.ontology_loader.ontology_report import ReportWriter
+from src.ontology_loader.loader import OntologyLoader
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -21,41 +17,32 @@ logger = logging.getLogger(__name__)
 @click.option("--db-user", default=os.getenv("MONGO_USER", "admin"), help="Database user")
 @click.option("--db-password", default=os.getenv("MONGO_PASSWORD", ""), help="Database password")
 @click.option("--source-ontology", default="envo", help="Lowercase ontology prefix, e.g., envo, go, uberon, etc.")
-def main(db_host, db_port, db_name, db_user, db_password, source_ontology):
-    """CLI entry point for the ontology loader."""
-    logging.info(f"Processing ontology: {source_ontology}")
+@click.option("--output-directory", default=None, help="Output directory for reporting, default is /tmp")
+@click.option("--generate-reports", default=True, help="Generate reports")
+def cli(db_host, db_port, db_name, db_user, db_password, source_ontology, output_directory, generate_reports):
+    """CLI entry point for the ontology loader.
 
-    # Load Schema View
-    nmdc_sv = load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
-    # Initialize the Ontology Processor
-    processor = OntologyProcessor(source_ontology)
+    :param db_host: MongoDB connection URL, default is localhost
+    :param db_port: MongoDB connection port, default is 27018
+    :param db_name: Database name, default is nmdc
+    :param db_user: Database user, default is admin
+    :param db_password: Database password, default is blank
+    :param source_ontology: Lowercase ontology prefix, e.g., envo, go, uberon, etc.
+    :param output_directory: Output directory for reporting, default is /tmp
+    :param generate_reports: Generate reports or not, default is True
+    """
+    logger.info(f"Processing ontology: {source_ontology}")
 
-    # Process ontology terms and return a list of OntologyClass dicts produced by linkml json dumper as dict
-    ontology_classes = processor.get_terms_and_metadata()
-
-    logger.info(f"Extracted {len(ontology_classes)} ontology classes.")
-
-    # Process ontology relations and create OntologyRelation objects
-    ontology_relations = processor.get_relations_closure()
-
-    logger.info(f"Extracted {len(ontology_relations)} ontology relations.")
-
-    # Connect to MongoDB
-    db_manager = MongoDBLoader(
-        schema_view=nmdc_sv, db_host=db_host, db_port=db_port, db_name=db_name, db_user=db_user, db_password=db_password
-    )
-
-    # Insert data into MongoDB
-    # Insert data into MongoDB
-    updates_report, insertions_report = db_manager.upsert_ontology_classes(ontology_classes)
-    db_manager.insert_ontology_relations(ontology_relations)
-
-    # Write reports
-    ReportWriter.write_reports([updates_report, insertions_report])
-    db_manager.insert_ontology_relations(ontology_relations)
-
-    logger.info("Processing complete. Data inserted into MongoDB.")
-
+    # Initialize the MongoDB Loader
+    loader = OntologyLoader(db_host=db_host,
+                            db_port=db_port,
+                            db_name=db_name,
+                            db_user=db_user,
+                            db_password=db_password,
+                            source_ontology=source_ontology,
+                            output_directory=output_directory,
+                            generate_reports=generate_reports)
+    loader.run_ontology_loader()
 
 if __name__ == "__main__":
-    main()
+    cli()

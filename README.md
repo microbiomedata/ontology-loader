@@ -12,6 +12,7 @@ specified by NMDC schema.
 - Docker
 - MongoDB
 - NMDC materialized schema
+- ENV variable for MONGO_PASSWORD (or pass it in via the cli/runner itself directly)
 
 ```bash
 
