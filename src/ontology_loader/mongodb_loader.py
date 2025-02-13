@@ -1,10 +1,8 @@
 """Load and process ontology terms and relations into MongoDB."""
 
-import csv
 import logging
 import os
 from dataclasses import asdict, fields
-from pathlib import Path
 from typing import List, Optional
 
 from linkml_runtime import SchemaView
@@ -62,9 +60,10 @@ class MongoDBLoader:
         self.db = self.client.attach_database(handle=self.handle, alias=db_name, schema_view=schema_view)
 
     def upsert_ontology_classes(
-            self, ontology_classes: List[OntologyClass], collection_name: str = "ontology_class_set"
+        self, ontology_classes: List[OntologyClass], collection_name: str = "ontology_class_set"
     ):
-        """Upsert each OntologyClass object into the 'ontology_class_set' collection and return reports.
+        """
+        Upsert each OntologyClass object into the 'ontology_class_set' collection and return reports.
 
         :param ontology_classes: A list of OntologyClass objects to upsert
         :param collection_name: The name of the MongoDB collection to upsert into.
@@ -103,7 +102,6 @@ class MongoDBLoader:
 
         logging.info(f"Finished upserting {len(ontology_classes)} OntologyClass objects into MongoDB.")
         return Report("update", updates_report, ontology_fields), Report("insert", insertions_report, ontology_fields)
-
 
     def insert_ontology_relations(self, ontology_relations, collection_name: str = "ontology_relation_set"):
         """

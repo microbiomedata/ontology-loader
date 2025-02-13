@@ -5,9 +5,10 @@ import os
 
 import click
 from utils import load_yaml_from_package
-from src.ontology_loader.ontology_report import ReportWriter
+
 from src.ontology_loader.mongodb_loader import MongoDBLoader
 from src.ontology_loader.ontology_processor import OntologyProcessor
+from src.ontology_loader.ontology_report import ReportWriter
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
