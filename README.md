@@ -38,3 +38,33 @@ specified by NMDC schema.
 % poetry run ontology_loader --source-ontology "envo"
 % poetry run ontology_loader --source-ontology "go"
 ```
+
+#### Running the tests
+```bash
+% make test
+```
+
+#### Running the linter
+```bash
+% make lint
+```
+
+#### python example usage
+% pip install nmdc-ontology-loader
+```python
+from  nmdc_ontology_loader.ontology_loader import OntologyLoader
+import tempfile
+
+def test_load_ontology():
+    """Test the load_ontology method."""
+    ontology_loader = OntologyLoader(
+        source_ontology="envo",
+        output_directory=tempfile.gettempdir(),
+        generate_reports=True,
+    )
+    ontology_loader.load_ontology()
+    assert ontology_loader.ontology_class_set
+    assert ontology_loader.ontology_relation_set
+    assert ontology_loader.ontology_class_set.count() > 0
+    assert ontology_loader.ontology_relation_set.count() > 0
+```
