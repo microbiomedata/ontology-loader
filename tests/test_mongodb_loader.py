@@ -1,13 +1,11 @@
 """Test the MongoDBLoader class."""
-
+from dataclasses import asdict
 from pathlib import Path
-
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
-
 from src.ontology_loader.mongodb_loader import MongoDBLoader
 from src.ontology_loader.utils import load_yaml_from_package
-
+from src.ontology_loader.reporter import ReportWriter
 
 @pytest.fixture()
 def schema_view():
@@ -34,12 +32,13 @@ def test_upsert_ontology_classes(schema_view):
 
     # creating this collection here, effectively wipes out any previous test data.
     collection = loader.db.create_collection("test_collection", recreate_if_exists=True)
+    updates_report, insertions_report = loader.upsert_ontology_classes(ontology_classes)
     loader.upsert_ontology_classes(ontology_classes, collection_name="test_collection")
+    ReportWriter.write_reports(reports=[updates_report, insertions_report],
+                               output_format="tsv", output_directory="/tmp")
 
-    updates_report = Path("ontology_updates.tsv")
-    insertions_report = Path("ontology_insertions.tsv")
 
-    assert updates_report.exists() or insertions_report.exists()
+    assert updates_report or insertions_report
 
     # Query the collection for unique IDs
     query_results = collection.find({"$or": [{"id": "nmdc:NC1"}, {"id": "nmdc:NC2"}]})  # Retrieve only the 'id' field
@@ -57,8 +56,8 @@ def test_insert_ontology_relations(schema_view):
     loader = MongoDBLoader(schema_view)
 
     ontology_relations = [
-        OntologyRelation(subject="nmdc:NC1", predicate="nmdc:is_a", object="nmdc:NC2", type="nmdc:OntologyRelation"),
-        OntologyRelation(subject="nmdc:NC2", predicate="nmdc:is_a", object="nmdc:NC3", type="nmdc:OntologyRelation"),
+        asdict(OntologyRelation(subject="nmdc:NC1", predicate="nmdc:is_a", object="nmdc:NC2", type="nmdc:OntologyRelation")),
+        asdict(OntologyRelation(subject="nmdc:NC2", predicate="nmdc:is_a", object="nmdc:NC3", type="nmdc:OntologyRelation")),
     ]
     # creating this collection here, effectively wipes out any previous test data.
     collection = loader.db.create_collection("test_collection", recreate_if_exists=True)

@@ -1991,8 +1991,8 @@ validation = ["linkml (>=1.8.0)"]
 [package.source]
 type = "git"
 url = "https://github.com/linkml/linkml-store.git"
-reference = "add_index"
-resolved_reference = "fd2981a3d88f60f30e53d92c0c4fd9035314fc07"
+reference = "modify_handle_auth"
+resolved_reference = "3264a38499d5128386cd80ecd94b0e6a17b0243d"
 
 [[package]]
 name = "lxml"
@@ -6027,4 +6027,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "42cc9dba7f3606f35fc0d15a7190d0813b7a233977384ca278748de1c291c5bd"
+content-hash = "c0188fc3d61281c2ffc706a30a68f49f768d834b509e7b44d4a6fff832ee5074"

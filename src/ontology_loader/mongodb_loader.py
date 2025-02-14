@@ -9,7 +9,7 @@ from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass
 
-from src.ontology_loader.ontology_report import Report
+from src.ontology_loader.reporter import Report
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -57,7 +57,12 @@ class MongoDBLoader:
         self.handle = f"mongodb://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?authSource=admin"
         logger.info(self.handle)
         self.client = Client(handle=self.handle)
-        self.db = self.client.attach_database(handle=self.handle, alias=db_name, schema_view=schema_view)
+
+        # Explicitly set the correct database
+        self.db = self.client.attach_database(
+            handle=self.handle,  # Ensure correct database is used
+        )
+        logger.info(f"Connected to MongoDB: {self.db}")
 
     def upsert_ontology_classes(
         self, ontology_classes: List[OntologyClass], collection_name: str = "ontology_class_set"
@@ -71,6 +76,7 @@ class MongoDBLoader:
         """
         collection = self.db.create_collection(collection_name, recreate_if_exists=False)
         collection.index("id", unique=False)
+        logging.info(collection_name)
 
         if not ontology_classes:
             logging.info("No OntologyClass objects to upsert.")
@@ -112,14 +118,8 @@ class MongoDBLoader:
 
         """
         collection = self.db.create_collection(collection_name, recreate_if_exists=False)
-
         if ontology_relations:
             for relation in ontology_relations:
-                if not isinstance(relation, dict):  # Ensure it's a dataclass
-                    collection.insert(asdict(relation))
-                elif isinstance(relation, dict):  # Already a dictionary, insert directly
-                    collection.insert(relation)
-                else:
-                    raise TypeError(f"Unexpected type for relation: {type(relation)}")
+                collection.insert(relation)
         else:
             logger.info("No OntologyRelation objects to insert.")
