@@ -1,5 +1,6 @@
 """Test the MongoDBLoader class."""
 
+import tempfile
 from dataclasses import asdict
 
 import pytest
@@ -38,7 +39,7 @@ def test_upsert_ontology_classes(schema_view):
     updates_report, insertions_report = loader.upsert_ontology_classes(ontology_classes)
     loader.upsert_ontology_classes(ontology_classes, collection_name="test_collection")
     ReportWriter.write_reports(
-        reports=[updates_report, insertions_report], output_format="tsv", output_directory="/tmp"
+        reports=[updates_report, insertions_report], output_format="tsv", output_directory=tempfile.gettempdir()
     )
 
     assert updates_report or insertions_report

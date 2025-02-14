@@ -27,11 +27,13 @@ class OntologyLoader:
         output_directory: str = tempfile.gettempdir(),
         generate_reports: bool = True,
     ):
+        """Set the parameters for the OntologyLoader."""
         self.source_ontology = source_ontology
         self.output_directory = output_directory
         self.generate_reports = generate_reports
 
     def run_ontology_loader(self):
+        """Run the OntologyLoader and insert data into MongoDB."""
         logging.info(f"Processing ontology: {self.source_ontology}")
 
         # Load Schema View
@@ -66,4 +68,5 @@ class OntologyLoader:
 
 
 if __name__ == "__main__":
+    """Run the OntologyLoader."""
     OntologyLoader().run_ontology_loader()

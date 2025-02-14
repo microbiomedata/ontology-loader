@@ -19,13 +19,14 @@ class MongoDBLoader:
 
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
-    def __init__(self, schema_view: Optional[SchemaView] = None, db_config: MongoDBConfig = MongoDBConfig()):
+    def __init__(self, schema_view: Optional[SchemaView] = None):
         """
         Initialize MongoDB using LinkML-store's client.
 
         :param schema_view: LinkML SchemaView for ontology
         :param db_config: Singleton configuration for MongoDB connection
         """
+        db_config = MongoDBConfig()
         self.schema_view = schema_view
         self.db_host = db_config.db_host
         self.db_port = db_config.db_port
