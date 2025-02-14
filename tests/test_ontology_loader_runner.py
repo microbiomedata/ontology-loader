@@ -1,4 +1,5 @@
 """Test the OntologyLoader class."""
+
 import tempfile
 from pathlib import Path
 
