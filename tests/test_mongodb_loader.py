@@ -1,6 +1,5 @@
 """Test the MongoDBLoader class."""
 from dataclasses import asdict
-from pathlib import Path
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from src.ontology_loader.mongodb_loader import MongoDBLoader
