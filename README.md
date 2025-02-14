@@ -50,7 +50,10 @@ specified by NMDC schema.
 ```
 
 #### python example usage
-% pip install nmdc-ontology-loader
+```bash
+pip install nmdc-ontology-loader
+```
+
 ```python
 from  nmdc_ontology_loader.ontology_loader import OntologyLoader
 import tempfile
