@@ -1,11 +1,13 @@
 """Test the OntologyLoader class."""
-
-import os
-import pytest
+import tempfile
 from pathlib import Path
+
+import pytest
+
 from src.ontology_loader.loader import OntologyLoader
 from src.ontology_loader.mongodb_loader import MongoDBLoader
 from src.ontology_loader.utils import load_yaml_from_package
+
 
 @pytest.fixture
 def schema_view():
@@ -17,14 +19,9 @@ def schema_view():
 def ontology_loader():
     """Initialize the OntologyLoader with test parameters."""
     return OntologyLoader(
-        db_host=os.getenv("MONGO_HOST", "localhost"),
-        db_port=int(os.getenv("MONGO_PORT", 27018)),
-        db_name="test_nmdc",
-        db_user=os.getenv("MONGO_USER", "admin"),
-        db_password=os.getenv("MONGO_PASSWORD", ""),
         source_ontology="envo",
-        output_directory="/tmp",
-        generate_reports=True
+        output_directory=tempfile.gettempdir(),
+        generate_reports=True,
     )
 
 
@@ -35,11 +32,6 @@ def test_ontology_loader_run(schema_view, ontology_loader):
     # Connect to MongoDB and verify inserted data
     db_manager = MongoDBLoader(
         schema_view=schema_view,
-        db_host=ontology_loader.db_host,
-        db_port=ontology_loader.db_port,
-        db_name=ontology_loader.db_name,
-        db_user=ontology_loader.db_user,
-        db_password=ontology_loader.db_password,
     )
 
     # Check ontology class insertions

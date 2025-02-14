@@ -1,6 +1,7 @@
 """Loads a YAML file from a given package."""
 
 import importlib.resources
+
 from linkml_runtime.utils.schemaview import SchemaView
 
 

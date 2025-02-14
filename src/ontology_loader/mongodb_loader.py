@@ -1,7 +1,6 @@
 """Load and process ontology terms and relations into MongoDB."""
 
 import logging
-import os
 from dataclasses import asdict, fields
 from typing import List, Optional
 
@@ -9,6 +8,7 @@ from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass
 
+from src.ontology_loader.mongo_db_config import MongoDBConfig
 from src.ontology_loader.reporter import Report
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -19,42 +19,33 @@ class MongoDBLoader:
 
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
-    def __init__(
-        self,
-        schema_view: Optional[SchemaView] = None,
-        db_host: str = os.getenv("MONGO_HOST", "localhost"),
-        db_port: int = int(os.getenv("MONGO_PORT", 27018)),
-        db_name: str = os.getenv("MONGO_DBNAME", "nmdc"),
-        db_user: str = os.getenv("MONGO_USERNAME", "admin"),
-        db_password: str = os.getenv("MONGO_PASSWORD", ""),
-    ):
+    def __init__(self, schema_view: Optional[SchemaView] = None, db_config: MongoDBConfig = MongoDBConfig()):
         """
         Initialize MongoDB using LinkML-store's client.
 
         :param schema_view: LinkML SchemaView for ontology
-        :param db_host: MongoDB host (default: "localhost" or environment variable MONGO_HOST)
-        :param db_port: MongoDB port (default: 27017 or environment variable MONGO_PORT)
-        :param db_name: MongoDB database name (default: "nmdc" or environment variable MONGO_DB)
-        :param db_user: MongoDB username (default: "admin" or environment variable MONGO_USER)
-        :param db_password: MongoDB password (default: "root" or environment variable MONGO_PASSWORD)
+        :param db_config: Singleton configuration for MongoDB connection
         """
         self.schema_view = schema_view
-        self.db_host = db_host
-        self.db_port = db_port
-        self.db_name = db_name
-        self.db_user = db_user
-        self.db_password = db_password
+        self.db_host = db_config.db_host
+        self.db_port = db_config.db_port
+        self.db_name = db_config.db_name
+        self.db_user = db_config.db_user
+        self.db_password = db_config.db_password
 
         # TODO: it might be that we are providing the connection string "incorrectly" (or differently) in linkml-store
         # this exists so that the default env parameters in nmdc-runtime can be used as they are currently
         # specified.
-        if db_host.startswith("mongodb://"):
+        if self.db_host.startswith("mongodb://"):
             # mongodb://mongo:27017
-            db_host = db_host.replace("mongodb://", "")
-            db_port = int(db_host.split(":")[1])
-            db_host = db_host.split(":")[0]
+            self.db_host = self.db_host.replace("mongodb://", "")
+            self.db_port = int(self.db_host.split(":")[1])
+            self.db_host = self.db_host.split(":")[0]
 
-        self.handle = f"mongodb://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?authSource=admin"
+        self.handle = (
+            f"mongodb://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}?authSource=admin"
+        )
+
         logger.info(self.handle)
         self.client = Client(handle=self.handle)
 

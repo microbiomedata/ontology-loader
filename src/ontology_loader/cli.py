@@ -2,8 +2,9 @@
 
 import logging
 import os
+
 import click
-from src.ontology_loader.mongodb_loader import MongoDBLoader
+
 from src.ontology_loader.loader import OntologyLoader
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -20,7 +21,8 @@ logger = logging.getLogger(__name__)
 @click.option("--output-directory", default=None, help="Output directory for reporting, default is /tmp")
 @click.option("--generate-reports", default=True, help="Generate reports")
 def cli(db_host, db_port, db_name, db_user, db_password, source_ontology, output_directory, generate_reports):
-    """CLI entry point for the ontology loader.
+    """
+    CLI entry point for the ontology loader.
 
     :param db_host: MongoDB connection URL, default is localhost
     :param db_port: MongoDB connection port, default is 27018
@@ -34,15 +36,18 @@ def cli(db_host, db_port, db_name, db_user, db_password, source_ontology, output
     logger.info(f"Processing ontology: {source_ontology}")
 
     # Initialize the MongoDB Loader
-    loader = OntologyLoader(db_host=db_host,
-                            db_port=db_port,
-                            db_name=db_name,
-                            db_user=db_user,
-                            db_password=db_password,
-                            source_ontology=source_ontology,
-                            output_directory=output_directory,
-                            generate_reports=generate_reports)
+    loader = OntologyLoader(
+        db_host=db_host,
+        db_port=db_port,
+        db_name=db_name,
+        db_user=db_user,
+        db_password=db_password,
+        source_ontology=source_ontology,
+        output_directory=output_directory,
+        generate_reports=generate_reports,
+    )
     loader.run_ontology_loader()
+
 
 if __name__ == "__main__":
     cli()

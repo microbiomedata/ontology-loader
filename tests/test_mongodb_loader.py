@@ -1,10 +1,14 @@
 """Test the MongoDBLoader class."""
+
 from dataclasses import asdict
+
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+
 from src.ontology_loader.mongodb_loader import MongoDBLoader
-from src.ontology_loader.utils import load_yaml_from_package
 from src.ontology_loader.reporter import ReportWriter
+from src.ontology_loader.utils import load_yaml_from_package
+
 
 @pytest.fixture()
 def schema_view():
@@ -33,9 +37,9 @@ def test_upsert_ontology_classes(schema_view):
     collection = loader.db.create_collection("test_collection", recreate_if_exists=True)
     updates_report, insertions_report = loader.upsert_ontology_classes(ontology_classes)
     loader.upsert_ontology_classes(ontology_classes, collection_name="test_collection")
-    ReportWriter.write_reports(reports=[updates_report, insertions_report],
-                               output_format="tsv", output_directory="/tmp")
-
+    ReportWriter.write_reports(
+        reports=[updates_report, insertions_report], output_format="tsv", output_directory="/tmp"
+    )
 
     assert updates_report or insertions_report
 
@@ -55,8 +59,12 @@ def test_insert_ontology_relations(schema_view):
     loader = MongoDBLoader(schema_view)
 
     ontology_relations = [
-        asdict(OntologyRelation(subject="nmdc:NC1", predicate="nmdc:is_a", object="nmdc:NC2", type="nmdc:OntologyRelation")),
-        asdict(OntologyRelation(subject="nmdc:NC2", predicate="nmdc:is_a", object="nmdc:NC3", type="nmdc:OntologyRelation")),
+        asdict(
+            OntologyRelation(subject="nmdc:NC1", predicate="nmdc:is_a", object="nmdc:NC2", type="nmdc:OntologyRelation")
+        ),
+        asdict(
+            OntologyRelation(subject="nmdc:NC2", predicate="nmdc:is_a", object="nmdc:NC3", type="nmdc:OntologyRelation")
+        ),
     ]
     # creating this collection here, effectively wipes out any previous test data.
     collection = loader.db.create_collection("test_collection", recreate_if_exists=True)
