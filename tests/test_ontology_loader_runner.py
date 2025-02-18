@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.ontology_loader.loader import OntologyLoader
+from src.ontology_loader.ontology_load_controller import OntologyLoaderController
 from src.ontology_loader.mongodb_loader import MongoDBLoader
 from src.ontology_loader.utils import load_yaml_from_package
 
@@ -19,7 +19,7 @@ def schema_view():
 @pytest.fixture
 def ontology_loader():
     """Initialize the OntologyLoader with test parameters."""
-    return OntologyLoader(
+    return OntologyLoaderController(
         source_ontology="envo",
         output_directory=tempfile.gettempdir(),
         generate_reports=True,

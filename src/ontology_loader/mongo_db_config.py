@@ -1,5 +1,4 @@
 """Singleton class to store default parameters accessed from client environment or sensible defaults."""
-
 import os
 
 

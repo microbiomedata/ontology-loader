@@ -5,7 +5,7 @@ import os
 
 import click
 
-from src.ontology_loader.loader import OntologyLoader
+from src.ontology_loader.ontology_load_controller import OntologyLoaderController
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def cli(db_host, db_port, db_name, db_user, db_password, source_ontology, output
     logger.info(f"Processing ontology: {source_ontology}")
 
     # Initialize the MongoDB Loader
-    loader = OntologyLoader(
+    loader = OntologyLoaderController(
         db_host=db_host,
         db_port=db_port,
         db_name=db_name,
