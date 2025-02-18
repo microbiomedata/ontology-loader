@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from src.ontology_loader.ontology_load_controller import OntologyLoaderController
 from src.ontology_loader.mongodb_loader import MongoDBLoader
+from src.ontology_loader.ontology_load_controller import OntologyLoaderController
 from src.ontology_loader.utils import load_yaml_from_package
 
 

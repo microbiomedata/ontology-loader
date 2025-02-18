@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class MongoDBLoader:
+
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
     def __init__(self, schema_view: Optional[SchemaView] = None):
@@ -56,7 +57,7 @@ class MongoDBLoader:
         logger.info(f"Connected to MongoDB: {self.db}")
 
     def upsert_ontology_classes(
-            self, ontology_classes: List[OntologyClass], collection_name: str = "ontology_class_set"
+        self, ontology_classes: List[OntologyClass], collection_name: str = "ontology_class_set"
     ):
         """
         Upsert each OntologyClass object into the 'ontology_class_set' collection and return reports.
