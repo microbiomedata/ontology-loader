@@ -2,7 +2,7 @@
 name = "ontology_loader"
 version = "0.0.0"
 description = "ontology_loader"
-authors = ["Author 1 <smoxon@lbl.gov>"]
+authors = ["Sierra Moxon <smoxon@lbl.gov>"]
 license = "MIT"
 readme = "README.md"
 
