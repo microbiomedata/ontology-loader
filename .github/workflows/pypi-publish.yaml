@@ -1,36 +1,33 @@
-name: Publish Python Package
+name: Publish to PyPI
 
 on:
-  workflow_dispatch:
   release:
-    types: [created]
-    
-jobs:
-  build-n-publish:
-    name: Build and publish Python 🐍 distributions 📦 to PyPI
-    runs-on: ubuntu-latest
+    types: [published]
 
+permissions:
+  id-token: write  # This enables OIDC authentication with PyPI
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.0.2
+      - name: Check out the repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v3.1.2
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: "3.11"
 
-      - name: Install Poetry
-        run: pip install poetry poetry-dynamic-versioning
-    
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: |
+          pip install build
 
-      - name: Build source and wheel archives
-        run: poetry build
+      - name: Build package
+        run: |
+          python -m build
 
-      - name: Publish distribution 📦 to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.5.0
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_TOKEN }}
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
     
