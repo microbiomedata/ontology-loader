@@ -1,10 +1,11 @@
 [tool.poetry]
-name = "ontology_loader"
 version = "0.0.0"
 description = "ontology_loader"
 authors = ["Sierra Moxon <smoxon@lbl.gov>"]
 license = "MIT"
 readme = "README.md"
+name = "ontology-loader"
+packages = [{ include = "ontology_loader", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -46,6 +47,7 @@ ontology_loader = "ontology_loader.cli:main"
 enable = false
 vcs = "git"
 style = "pep440"
+
 
 [tool.black]
 line-length = 120

@@ -1947,25 +1947,27 @@ requests = "*"
 
 [[package]]
 name = "linkml-store"
-version = "0.0.0"
+version = "0.2.6"
 description = "linkml-store"
 optional = false
-python-versions = "^3.10"
-files = []
-develop = false
+python-versions = "<4.0,>=3.10"
+files = [
+    {file = "linkml_store-0.2.6-py3-none-any.whl", hash = "sha256:02d6cfe53e57bedd1cb4e26ddde9a4b0f8e7c629dc944dbbeb73434538b80c74"},
+    {file = "linkml_store-0.2.6.tar.gz", hash = "sha256:1eb41e69c612dc3bcb6933af5426fe822333ae0fcf4ae104cd65aeacf79e83ea"},
+]
 
 [package.dependencies]
 click = "*"
 duckdb = ">=0.10.1"
 duckdb-engine = ">=0.11.2"
-jinja2 = "^3.1.4"
-jsonlines = "^4.0.0"
+jinja2 = ">=3.1.4,<4.0.0"
+jsonlines = ">=4.0.0,<5.0.0"
 jsonpatch = ">=1.33"
 linkml-runtime = ">=1.8.0"
 multipledispatch = "*"
-pydantic = "^2.0.0"
-pystow = "^0.5.4"
-python-dotenv = "^1.0.1"
+pydantic = ">=2.0.0,<3.0.0"
+pystow = ">=0.5.4,<0.6.0"
+python-dotenv = ">=1.0.1,<2.0.0"
 sqlalchemy = "*"
 tabulate = "*"
 xmltodict = ">=0.13.0"
@@ -1987,12 +1989,6 @@ renderer = ["linkml_renderer"]
 scipy = ["scikit-learn", "scipy"]
 tests = ["black (>=24.0.0)", "ruff (>=0.6.2)"]
 validation = ["linkml (>=1.8.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/linkml/linkml-store.git"
-reference = "modify_handle_auth"
-resolved_reference = "3264a38499d5128386cd80ecd94b0e6a17b0243d"
 
 [[package]]
 name = "lxml"
@@ -6027,4 +6023,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "c0188fc3d61281c2ffc706a30a68f49f768d834b509e7b44d4a6fff832ee5074"
+content-hash = "c1c87b1addf4d20cc4b889eb3a32c150e6ec5fa49938b2b94bc6444831827c70"
