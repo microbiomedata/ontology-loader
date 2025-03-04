@@ -8,7 +8,7 @@ permissions:
   id-token: write  # This enables OIDC authentication with PyPI
 
 jobs:
-  pypi-publish:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
