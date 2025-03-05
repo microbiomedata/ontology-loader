@@ -3,7 +3,7 @@
 import logging
 from dataclasses import asdict, fields
 from typing import List, Optional
-
+import os
 from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass
@@ -21,24 +21,22 @@ class MongoDBLoader:
 
     def __init__(self, schema_view: Optional[SchemaView] = None):
         """
-        Initialize MongoDB using LinkML-store's client.
+        Initialize MongoDB using LinkML-store's client, prioritizing environment variables for connection details.
 
         :param schema_view: LinkML SchemaView for ontology
-        :param db_config: Singleton configuration for MongoDB connection
         """
         db_config = MongoDBConfig()
         self.schema_view = schema_view
-        self.db_host = db_config.db_host
-        self.db_port = db_config.db_port
-        self.db_name = db_config.db_name
-        self.db_user = db_config.db_user
-        self.db_password = db_config.db_password
 
-        # TODO: it might be that we are providing the connection string "incorrectly" (or differently) in linkml-store
-        # this exists so that the default env parameters in nmdc-runtime can be used as they are currently
-        # specified.
+        # Get database config from environment variables or fallback to MongoDBConfig defaults
+        self.db_host = os.getenv("MONGO_HOST", db_config.db_host)
+        self.db_port = int(os.getenv("MONGO_PORT", db_config.db_port))
+        self.db_name = os.getenv("MONGO_DB", db_config.db_name)
+        self.db_user = os.getenv("MONGO_USER", db_config.db_user)
+        self.db_password = os.getenv("MONGO_PASSWORD", db_config.db_password)
+
+        # Handle MongoDB connection string variations
         if self.db_host.startswith("mongodb://"):
-            # mongodb://mongo:27017
             self.db_host = self.db_host.replace("mongodb://", "")
             self.db_port = int(self.db_host.split(":")[1])
             self.db_host = self.db_host.split(":")[0]
@@ -47,13 +45,10 @@ class MongoDBLoader:
             f"mongodb://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}?authSource=admin"
         )
 
-        logger.info(self.handle)
+        logger.info(f"MongoDB connection string: {self.handle}")
         self.client = Client(handle=self.handle)
+        self.db = self.client.attach_database(handle=self.handle)
 
-        # Explicitly set the correct database
-        self.db = self.client.attach_database(
-            handle=self.handle,  # Ensure correct database is used
-        )
         logger.info(f"Connected to MongoDB: {self.db}")
 
     def upsert_ontology_classes(
