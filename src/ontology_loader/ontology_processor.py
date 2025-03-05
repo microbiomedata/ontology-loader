@@ -3,6 +3,7 @@
 import gzip
 import logging
 import shutil
+from typing import List
 
 import pystow
 from linkml_runtime.dumpers import json_dumper
@@ -77,15 +78,21 @@ class OntologyProcessor:
 
         return ontology_classes
 
-    def get_relations_closure(self, predicates=None):
+    def get_relations_closure(self, predicates=None, ontology_terms: list = None) -> tuple:
         """
         Retrieve all ontology relations closure for terms.
 
         :param predicates: List of predicates to consider (default: ["rdfs:subClassOf", "BFO:0000050"])
+        :param ontology_terms: List of OntologyClass objects to consider (default: None)
 
         """
         predicates = ["rdfs:subClassOf", "BFO:0000050"] if predicates is None else predicates
         ontology_relations = []
+
+        # turn the ontology_terms list of OntologyClass objects into a dictionary for fast lookup
+        if ontology_terms is None:
+            ontology_terms = []
+        ontology_terms_dict = {term.id: term for term in ontology_terms}
 
         for entity in self.adapter.entities():
             if entity.startswith(self.ontology.upper() + ":"):
@@ -103,7 +110,12 @@ class OntologyProcessor:
                         type="nmdc:OntologyRelation",
                     )
 
+                    # Use the dictionary for fast lookup
+                    if entity in ontology_terms_dict:
+                        ontology_terms_dict[entity].relations.append(ontology_relation)
+
                     # Convert OntologyRelation instance to a dictionary
                     ontology_relations.append(json_dumper.to_dict(ontology_relation))
 
-        return ontology_relations
+        # send back the ontology_relations list and covert the quick dict lookup structure back to a list
+        return ontology_relations, list(ontology_terms_dict.values())

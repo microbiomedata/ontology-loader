@@ -26,7 +26,7 @@ def test_get_terms_and_metadata():
 def test_get_relations_closure():
     """Test retrieval of ontology relations closure."""
     processor = OntologyProcessor("envo")
-    ontology_relations = processor.get_relations_closure()
+    ontology_relations, _ = processor.get_relations_closure()
 
     assert isinstance(ontology_relations, list)
     assert all(isinstance(rel, dict) for rel in ontology_relations)

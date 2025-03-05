@@ -47,7 +47,7 @@ class OntologyLoaderController:
         logger.info(f"Extracted {len(ontology_classes)} ontology classes.")
 
         # Process ontology relations and create OntologyRelation objects
-        ontology_relations = processor.get_relations_closure()
+        ontology_relations, ontology_classes_relations = processor.get_relations_closure()
 
         logger.info(f"Extracted {len(ontology_relations)} ontology relations.")
 
@@ -57,8 +57,7 @@ class OntologyLoaderController:
         logger.info(f"MongoDB host {db_manager.db_host}")
 
         # Insert data into MongoDB
-        updates_report, insertions_report = db_manager.upsert_ontology_classes(ontology_classes)
-        db_manager.insert_ontology_relations(ontology_relations)
+        updates_report, insertions_report = db_manager.upsert_ontology_classes(ontology_classes_relations)
         db_manager.insert_ontology_relations(ontology_relations)
 
         # Optionally write job reports
