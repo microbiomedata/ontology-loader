@@ -17,5 +17,5 @@ class MongoDBConfig:
             cls._instance.db_user = os.getenv("MONGO_USER", "admin")
             cls._instance.db_password = os.getenv("MONGO_PASSWORD", "")
             cls._instance.db_host = os.getenv("MONGO_HOST", "localhost")
-            cls._instance.db_port = int(os.getenv("MONGO_PORT", 27017))
+            cls._instance.db_port = int(os.getenv("MONGO_PORT", 27018))
         return cls._instance

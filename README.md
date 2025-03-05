@@ -17,7 +17,7 @@ specified by NMDC schema.
 ```bash
 
 % docker pull mongo
-% docker run -d --name mongodb-container -p 27017:27017 mongo
+% docker run -d --name mongodb-container -p 27018:27017 mongo
 ```
 
 #### Basic mongosh commands
