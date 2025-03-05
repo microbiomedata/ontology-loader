@@ -47,7 +47,7 @@ class OntologyLoaderController:
         logger.info(f"Extracted {len(ontology_classes)} ontology classes.")
 
         # Process ontology relations and create OntologyRelation objects
-        ontology_relations, ontology_classes_relations = processor.get_relations_closure()
+        ontology_relations, ontology_classes_relations = processor.get_relations_closure(ontology_terms=ontology_classes)
 
         logger.info(f"Extracted {len(ontology_relations)} ontology relations.")
 

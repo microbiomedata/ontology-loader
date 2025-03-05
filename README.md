@@ -24,9 +24,9 @@ specified by NMDC schema.
 ```bash
 % docker ps
 % docker exec -it [mongodb-container-id] bash
-% mongosh
+% mongosh mongodb://admin:root@mongo:27017/nmdc?authSource=admin
 % show dbs
-% use test
+% use nmdc
 % db.ontology_class_set.find().pretty()
 % db.ontology_relation_set.find().pretty()
 ``` 
@@ -70,4 +70,13 @@ def test_load_ontology():
     assert ontology_loader.ontology_relation_set
     assert ontology_loader.ontology_class_set.count() > 0
     assert ontology_loader.ontology_relation_set.count() > 0
+```
+
+### Reset collections in dev
+
+```
+% docker exec -it mongodb-container bash
+% mongosh mongodb://admin:root@mongo:27017/nmdc?authSource=admin
+% db.ontology_class_set.drop()
+% db.ontology_relation_set.drop()
 ```
