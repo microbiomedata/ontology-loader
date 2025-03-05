@@ -1,9 +1,10 @@
 """Load and process ontology terms and relations into MongoDB."""
 
 import logging
+import os
 from dataclasses import asdict, fields
 from typing import List, Optional
-import os
+
 from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass

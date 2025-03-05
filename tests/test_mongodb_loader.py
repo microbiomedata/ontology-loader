@@ -61,16 +61,10 @@ def test_insert_ontology_relations(schema_view):
 
     ontology_relations = [
         asdict(
-            OntologyRelation(subject="nmdc:NC1",
-                             predicate="nmdc:is_a",
-                             object="nmdc:NC2",
-                             type="nmdc:OntologyRelation")
+            OntologyRelation(subject="nmdc:NC1", predicate="nmdc:is_a", object="nmdc:NC2", type="nmdc:OntologyRelation")
         ),
         asdict(
-            OntologyRelation(subject="nmdc:NC2",
-                             predicate="nmdc:is_a",
-                             object="nmdc:NC3",
-                             type="nmdc:OntologyRelation")
+            OntologyRelation(subject="nmdc:NC2", predicate="nmdc:is_a", object="nmdc:NC3", type="nmdc:OntologyRelation")
         ),
     ]
     # creating this collection here, effectively wipes out any previous test data.
@@ -83,14 +77,8 @@ def test_insert_ontology_relations(schema_view):
 
     # Expected records
     expected_records = [
-        {"subject": "nmdc:NC1",
-         "predicate": "nmdc:is_a",
-         "object": "nmdc:NC2",
-         "type": "nmdc:OntologyRelation"},
-        {"subject": "nmdc:NC2",
-         "predicate": "nmdc:is_a",
-         "object": "nmdc:NC3",
-         "type": "nmdc:OntologyRelation"},
+        {"subject": "nmdc:NC1", "predicate": "nmdc:is_a", "object": "nmdc:NC2", "type": "nmdc:OntologyRelation"},
+        {"subject": "nmdc:NC2", "predicate": "nmdc:is_a", "object": "nmdc:NC3", "type": "nmdc:OntologyRelation"},
     ]
 
     for expected_record in expected_records:
