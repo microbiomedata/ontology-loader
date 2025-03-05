@@ -8,8 +8,8 @@ from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass
 
-from src.ontology_loader.mongo_db_config import MongoDBConfig
-from src.ontology_loader.reporter import Report
+from ontology_loader.mongo_db_config import MongoDBConfig
+from ontology_loader.reporter import Report
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

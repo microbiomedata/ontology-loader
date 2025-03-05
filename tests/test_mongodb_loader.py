@@ -6,9 +6,9 @@ from dataclasses import asdict
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 
-from src.ontology_loader.mongodb_loader import MongoDBLoader
-from src.ontology_loader.reporter import ReportWriter
-from src.ontology_loader.utils import load_yaml_from_package
+from ontology_loader.mongodb_loader import MongoDBLoader
+from ontology_loader.reporter import ReportWriter
+from ontology_loader.utils import load_yaml_from_package
 
 
 @pytest.fixture()

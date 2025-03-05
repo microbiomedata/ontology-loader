@@ -5,7 +5,7 @@ import os
 
 import click
 
-from src.ontology_loader.ontology_load_controller import OntologyLoaderController
+from ontology_loader.ontology_load_controller import OntologyLoaderController
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
