@@ -66,8 +66,6 @@ class MongoDBLoader:
         collection.index("id", unique=False)
         logging.info(collection_name)
 
-        print(self.db.handle)
-        print(self.db.metadata)
         if not ontology_classes:
             logging.info("No OntologyClass objects to upsert.")
             return Report("update", [], []), Report("insert", [], [])

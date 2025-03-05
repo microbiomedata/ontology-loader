@@ -93,7 +93,6 @@ class OntologyProcessor:
         if ontology_terms is None:
             ontology_terms = []
         ontology_terms_dict = {term.id: term for term in ontology_terms}
-        print("terms dict length", len(ontology_terms_dict))
 
         for entity in self.adapter.entities():
             # entity is an ontology (aka: ENVO) term curie
