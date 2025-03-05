@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 @click.command()
 @click.option("--db-host", default=os.getenv("MONGO_HOST", "localhost"), help="MongoDB connection URL")
-@click.option("--db-port", default=int(os.getenv("MONGO_PORT", 27018)), help="MongoDB connection port")
+@click.option("--db-port", default=int(os.getenv("MONGO_PORT", 27017)), help="MongoDB connection port")
 @click.option("--db-name", default=os.getenv("MONGO_DB", "nmdc"), help="Database name")
 @click.option("--db-user", default=os.getenv("MONGO_USER", "admin"), help="Database user")
 @click.option("--db-password", default=os.getenv("MONGO_PASSWORD", ""), help="Database password")
@@ -25,7 +25,7 @@ def cli(db_host, db_port, db_name, db_user, db_password, source_ontology, output
     CLI entry point for the ontology loader.
 
     :param db_host: MongoDB connection URL, default is localhost
-    :param db_port: MongoDB connection port, default is 27018
+    :param db_port: MongoDB connection port, default is 27017
     :param db_name: Database name, default is nmdc
     :param db_user: Database user, default is admin
     :param db_password: Database password, default is blank
