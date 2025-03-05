@@ -1,6 +1,5 @@
 """Reporting class to handle TSV dumping."""
 
-import logging
 import csv
 import logging
 import tempfile
@@ -12,20 +11,29 @@ logger = logging.getLogger(__name__)
 
 
 class Report:
+
     """Class to hold report data."""
 
     def __init__(self, report_type: str, records: List[List[str]], headers: List[str]):
+        """
+        Initialize the Report object with the given report type, records, and headers.
+
+        :param report_type: The type of report (e.g., "insertions", "updates")
+        :param records: A list of records to include in the report
+        :param headers: A list of headers to include in the report
+        """
         self.report_type = report_type
         self.records = records
         self.headers = headers
 
+
 class ReportWriter:
+
     """ReportWriter class to write reports to TSV files."""
 
     @staticmethod
     def write_reports(reports: List[Report], output_format: str = "tsv", output_directory: Optional[str] = None):
         """Write reports to a directory, creating one in a temporary location if not provided."""
-
         # Create a temporary directory if output_directory is None
         if output_directory is None:
             output_directory = Path(tempfile.mkdtemp(prefix="ontology_reports_"))

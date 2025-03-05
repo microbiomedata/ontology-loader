@@ -3,7 +3,6 @@
 import gzip
 import logging
 import shutil
-from typing import List
 
 import pystow
 from linkml_runtime.dumpers import json_dumper
