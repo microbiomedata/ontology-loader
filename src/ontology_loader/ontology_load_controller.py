@@ -53,6 +53,9 @@ class OntologyLoaderController:
 
         # Connect to MongoDB
         db_manager = MongoDBLoader(schema_view=nmdc_sv)
+        print(db_manager.db_port)
+        print(db_manager.db_name)
+
         # Insert data into MongoDB
         updates_report, insertions_report = db_manager.upsert_ontology_classes(ontology_classes)
         db_manager.insert_ontology_relations(ontology_relations)
