@@ -4,11 +4,9 @@ import logging
 import os
 from dataclasses import asdict, fields
 from typing import List, Optional
-
 from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass
-
 from ontology_loader.mongo_db_config import MongoDBConfig
 from ontology_loader.reporter import Report
 
