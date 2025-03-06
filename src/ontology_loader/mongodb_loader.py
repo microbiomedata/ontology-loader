@@ -134,7 +134,7 @@ class MongoDBLoader:
 
         logging.info(
             f"Finished processing {len(ontology_relations)} OntologyRelation objects. "
-            f"Inserted {len(insertions_report)} new relations."
+            f"Upserted {len(insertions_report)} relations."
         )
         return Report("insert", insertions_report, ["subject", "predicate", "object"])
 
