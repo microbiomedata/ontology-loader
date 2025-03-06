@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-
 from ontology_loader.mongodb_loader import MongoDBLoader
 from ontology_loader.ontology_load_controller import OntologyLoaderController
 from ontology_loader.utils import load_yaml_from_package
