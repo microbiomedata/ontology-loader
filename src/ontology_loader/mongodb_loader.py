@@ -4,12 +4,13 @@ import logging
 import os
 from dataclasses import asdict, fields
 from typing import List, Optional
+
 from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+
 from ontology_loader.mongo_db_config import MongoDBConfig
 from ontology_loader.reporter import Report, ReportWriter
-
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class MongoDBLoader:
 
         if not ontology_classes:
             logging.info("No OntologyClass objects to upsert.")
-            return Report("update", [], []), Report("insert", [], [])
+            return (Report("update", [], []), Report("insert", [], []))
 
         updates_report = []
         insertions_report = []
@@ -96,8 +97,9 @@ class MongoDBLoader:
         logging.info(f"Finished upserting {len(ontology_classes)} OntologyClass objects into MongoDB.")
         return Report("update", updates_report, ontology_fields), Report("insert", insertions_report, ontology_fields)
 
-    def upsert_ontology_relations(self, ontology_relations: List[OntologyRelation],
-                                  collection_name: str = "ontology_relation_set"):
+    def upsert_ontology_relations(
+        self, ontology_relations: List[OntologyRelation], collection_name: str = "ontology_relation_set"
+    ):
         """
         Upsert each OntologyRelation object into the 'ontology_relation_set' collection.
 
@@ -116,30 +118,32 @@ class MongoDBLoader:
 
         # Ensure all relations are OntologyRelation instances
         processed_relations = [
-            OntologyRelation(**relation) if isinstance(relation, dict) else relation
-            for relation in ontology_relations
+            OntologyRelation(**relation) if isinstance(relation, dict) else relation for relation in ontology_relations
         ]
 
         for relation in processed_relations:
-            filter_criteria = {
-                "subject": relation.subject,
-                "predicate": relation.predicate,
-                "object": relation.object
-            }
+            filter_criteria = {"subject": relation.subject, "predicate": relation.predicate, "object": relation.object}
             if collection.find(filter_criteria).num_rows == 0:  # Only insert if it doesn't already exist
                 collection.upsert([asdict(relation)], filter_fields=["subject", "predicate", "object"])
                 logging.debug(
-                    f"Inserted new OntologyRelation (subject={relation.subject}, predicate={relation.predicate}, object={relation.object}).")
+                    f"Inserted new OntologyRelation (subject={relation.subject}, "
+                    f"predicate={relation.predicate}, "
+                    f"object={relation.object})."
+                )
                 insertions_report.append([relation.subject, relation.predicate, relation.object])
 
         logging.info(
-            f"Finished processing {len(ontology_relations)} OntologyRelation objects. Inserted {len(insertions_report)} new relations.")
+            f"Finished processing {len(ontology_relations)} OntologyRelation objects. "
+            f"Inserted {len(insertions_report)} new relations."
+        )
         return Report("insert", insertions_report, ["subject", "predicate", "object"])
 
-    def delete_obsolete_relations(self,
-                                  relation_collection: str = "ontology_relation_set",
-                                  class_collection: str = "ontology_class_set",
-                                  output_directory: Optional[str] = None):
+    def delete_obsolete_relations(
+        self,
+        relation_collection: str = "ontology_relation_set",
+        class_collection: str = "ontology_class_set",
+        output_directory: Optional[str] = None,
+    ):
         """
         Delete relations where the subject or object is an OntologyClass with is_obsolete set to True.
 
@@ -159,18 +163,18 @@ class MongoDBLoader:
             return
 
         # Fetch relations to be deleted
-        relations_to_delete = relation_coll.find({"$or": [
-            {"subject": {"$in": list(obsolete_ids)}},
-            {"object": {"$in": list(obsolete_ids)}}
-        ]}).rows
+        relations_to_delete = relation_coll.find(
+            {"$or": [{"subject": {"$in": list(obsolete_ids)}}, {"object": {"$in": list(obsolete_ids)}}]}
+        ).rows
 
         if not relations_to_delete:
             logger.info("No relations referencing obsolete classes found. No deletions performed.")
             return
 
         # Generate report data
-        report_records = [[rel.get("subject", ""), rel.get("predicate", ""), rel.get("object", "")] for rel in
-                          relations_to_delete]
+        report_records = [
+            [rel.get("subject", ""), rel.get("predicate", ""), rel.get("object", "")] for rel in relations_to_delete
+        ]
         report_headers = ["subject", "predicate", "object"]
 
         # Write deletion report
@@ -178,9 +182,8 @@ class MongoDBLoader:
         ReportWriter.write_reports([deletion_report], output_directory=output_directory)
 
         # Perform deletion
-        delete_count = relation_coll.delete_where({"$or": [
-            {"subject": {"$in": list(obsolete_ids)}},
-            {"object": {"$in": list(obsolete_ids)}}
-        ]})
+        delete_count = relation_coll.delete_where(
+            {"$or": [{"subject": {"$in": list(obsolete_ids)}}, {"object": {"$in": list(obsolete_ids)}}]}
+        )
 
         logger.info(f"{delete_count} relations deleted. Report saved to {output_directory or 'temporary directory'}.")
