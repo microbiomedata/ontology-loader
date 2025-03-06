@@ -27,11 +27,21 @@ class Report:
 
 
 class ReportWriter:
-    """ReportWriter class to write reports to TSV files."""
+    """
+    ReportWriter class to write reports to TSV files.
+
+    This class provides a static method to write reports to TSV files in a given directory.
+    """
 
     @staticmethod
     def write_reports(reports: List[Report], output_format: str = "tsv", output_directory: Optional[str] = None):
-        """Write reports to a directory, creating one in a temporary location if not provided."""
+        """
+        Write reports to a directory, creating one in a temporary location if not provided.
+
+        :param reports: A list of Report objects to write to files
+        :param output_format: The output format for the reports (default: "tsv")
+        :param output_directory: The directory to write the reports to (default: None)
+        """
         # Create a temporary directory if output_directory is None
         if output_directory is None:
             output_directory = Path(tempfile.mkdtemp(prefix="ontology_reports_"))
