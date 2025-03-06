@@ -128,7 +128,7 @@ class MongoDBLoader:
             }
             if collection.find(filter_criteria).num_rows == 0:  # Only insert if it doesn't already exist
                 collection.upsert([asdict(relation)], filter_fields=["subject", "predicate", "object"])
-                logging.info(
+                logging.debug(
                     f"Inserted new OntologyRelation (subject={relation.subject}, predicate={relation.predicate}, object={relation.object}).")
                 insertions_report.append([relation.subject, relation.predicate, relation.object])
 
