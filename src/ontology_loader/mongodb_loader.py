@@ -132,6 +132,8 @@ class MongoDBLoader:
                 )
                 insertions_report.append([relation.subject, relation.predicate, relation.object])
 
+
+
         logging.info(
             f"Finished processing {len(ontology_relations)} OntologyRelation objects. "
             f"Upserted {len(insertions_report)} relations."

@@ -8,7 +8,7 @@ name = "ontology-loader"
 packages = [{ include = "ontology_loader", from = "src" }]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.10"
 pymongo = "^4.9.1"
 nmdc-schema = "*"
 oaklib = "^0.6.16"
