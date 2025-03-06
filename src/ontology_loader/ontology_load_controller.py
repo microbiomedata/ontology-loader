@@ -62,7 +62,7 @@ class OntologyLoaderController:
         updates_report, insertions_report = db_manager.upsert_ontology_classes(ontology_classes_relations)
         # Delete obsolete relations and insert new relations
         db_manager.delete_obsolete_relations()
-        db_manager.insert_ontology_relations(ontology_relations)
+        db_manager.upsert_ontology_relations(ontology_relations)
 
         # Optionally write job reports
         if self.generate_reports:

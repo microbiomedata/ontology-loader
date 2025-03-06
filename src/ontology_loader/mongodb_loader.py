@@ -6,7 +6,7 @@ from dataclasses import asdict, fields
 from typing import List, Optional
 from linkml_runtime import SchemaView
 from linkml_store import Client
-from nmdc_schema.nmdc import OntologyClass
+from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from ontology_loader.mongo_db_config import MongoDBConfig
 from ontology_loader.reporter import Report, ReportWriter
 
@@ -96,22 +96,45 @@ class MongoDBLoader:
         logging.info(f"Finished upserting {len(ontology_classes)} OntologyClass objects into MongoDB.")
         return Report("update", updates_report, ontology_fields), Report("insert", insertions_report, ontology_fields)
 
-    def insert_ontology_relations(self, ontology_relations, collection_name: str = "ontology_relation_set"):
+    def upsert_ontology_relations(self, ontology_relations: List[OntologyRelation],
+                                  collection_name: str = "ontology_relation_set"):
         """
-        Insert each OntologyClass object into the 'ontology_class_set' collection.
+        Upsert each OntologyRelation object into the 'ontology_relation_set' collection.
 
-        :param ontology_relations: A list of OntologyRelation objects to insert
-        :param collection_name: The name of the MongoDB collection to insert into.
-
+        :param ontology_relations: A list of OntologyRelation objects to upsert.
+        :param collection_name: The name of the MongoDB collection to upsert into.
+        :return: A Report object for insertions.
         """
         collection = self.db.create_collection(collection_name, recreate_if_exists=False)
-        if ontology_relations:
-            for relation in ontology_relations:
-                collection.insert(relation)
-        else:
-            logger.info("No OntologyRelation objects to insert.")
+        collection.index(["subject", "predicate", "object"], unique=False)
 
-    from ontology_loader.reporter import Report, ReportWriter
+        if not ontology_relations:
+            logging.info("No OntologyRelation objects to upsert.")
+            return Report("insert", [], [])
+
+        insertions_report = []
+
+        # Ensure all relations are OntologyRelation instances
+        processed_relations = [
+            OntologyRelation(**relation) if isinstance(relation, dict) else relation
+            for relation in ontology_relations
+        ]
+
+        for relation in processed_relations:
+            filter_criteria = {
+                "subject": relation.subject,
+                "predicate": relation.predicate,
+                "object": relation.object
+            }
+            if collection.find(filter_criteria).num_rows == 0:  # Only insert if it doesn't already exist
+                collection.upsert([asdict(relation)], filter_fields=["subject", "predicate", "object"])
+                logging.info(
+                    f"Inserted new OntologyRelation (subject={relation.subject}, predicate={relation.predicate}, object={relation.object}).")
+                insertions_report.append([relation.subject, relation.predicate, relation.object])
+
+        logging.info(
+            f"Finished processing {len(ontology_relations)} OntologyRelation objects. Inserted {len(insertions_report)} new relations.")
+        return Report("insert", insertions_report, ["subject", "predicate", "object"])
 
     def delete_obsolete_relations(self,
                                   relation_collection: str = "ontology_relation_set",
