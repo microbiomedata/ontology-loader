@@ -21,9 +21,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: |
-          pip install tox
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: lint
+        run: make lint
 
 
   test:
@@ -50,6 +52,3 @@ jobs:
 
       - name: Run test suite
         run: make test
-
-      - name: Check code quality with flake8
-        run: make lint
