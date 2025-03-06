@@ -1,14 +1,14 @@
 """Test the MongoDBLoader class."""
 
 import tempfile
-from dataclasses import asdict
-from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+
+import pytest
+from nmdc_schema.nmdc import OntologyClass
 
 from ontology_loader.mongodb_loader import MongoDBLoader
 from ontology_loader.reporter import ReportWriter
 from ontology_loader.utils import load_yaml_from_package
-import pytest
-from unittest.mock import MagicMock
+
 
 @pytest.fixture()
 def schema_view():
@@ -72,9 +72,9 @@ def mongo_loader(schema_view):
     class_collection.delete([{}])  # Delete all records
     relation_collection.delete([{}])  # Delete all records
 
+
 def test_delete_obsolete_relations(mongo_loader):
     """Test that relations involving obsolete ontology classes are deleted."""
-
     # Insert test ontology classes using MongoDBLoader client
     class_collection = mongo_loader.db.get_collection("ontology_class_set")
     class_collection.insert({"id": "OBSOLETE_1", "is_obsolete": True})
@@ -85,7 +85,9 @@ def test_delete_obsolete_relations(mongo_loader):
     relation_collection = mongo_loader.db.get_collection("ontology_relation_set")
     relation_collection.insert({"subject": "OBSOLETE_1", "predicate": "is_a", "object": "ACTIVE_1"})
     relation_collection.insert({"subject": "ACTIVE_1", "predicate": "is_a", "object": "OBSOLETE_2"})
-    relation_collection.insert({"subject": "ACTIVE_1", "predicate": "is_a", "object": "ACTIVE_2"})  # Should NOT be deleted
+    relation_collection.insert(
+        {"subject": "ACTIVE_1", "predicate": "is_a", "object": "ACTIVE_2"}
+    )  # Should NOT be deleted
 
     # Run the deletion method
     mongo_loader.delete_obsolete_relations()
@@ -94,9 +96,7 @@ def test_delete_obsolete_relations(mongo_loader):
     remaining_relations = relation_collection.find({}).rows
 
     # Expected: Only the last relation should remain
-    expected_remaining = [
-        {"subject": "ACTIVE_1", "predicate": "is_a", "object": "ACTIVE_2"}
-    ]
+    expected_remaining = [{"subject": "ACTIVE_1", "predicate": "is_a", "object": "ACTIVE_2"}]
 
     assert len(remaining_relations) == len(expected_remaining)
     for relation in remaining_relations:

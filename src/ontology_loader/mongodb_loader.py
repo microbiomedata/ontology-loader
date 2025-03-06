@@ -112,12 +112,11 @@ class MongoDBLoader:
         else:
             logger.info("No OntologyRelation objects to insert.")
 
-    def delete_obsolete_relations(self,
-                                  relation_collection: str = "ontology_relation_set",
-                                  class_collection: str = "ontology_class_set"):
+    def delete_obsolete_relations(
+        self, relation_collection: str = "ontology_relation_set", class_collection: str = "ontology_class_set"
+    ):
         """
-        Delete relations from the ontology_relation_set collection where the subject or object
-        is an OntologyClass with is_obsolete set to True.
+        Delete relations where the subject or object is an OntologyClass with is_obsolete set to True.
 
         :param relation_collection: The name of the MongoDB collection storing ontology relations.
         :param class_collection: The name of the MongoDB collection storing ontology classes.
@@ -134,8 +133,7 @@ class MongoDBLoader:
             return
 
         # Delete relations where subject or object references an obsolete class
-        delete_count = relation_coll.delete_where({"$or": [
-            {"subject": {"$in": list(obsolete_ids)}},
-            {"object": {"$in": list(obsolete_ids)}}
-        ]})
+        delete_count = relation_coll.delete_where(
+            {"$or": [{"subject": {"$in": list(obsolete_ids)}}, {"object": {"$in": list(obsolete_ids)}}]}
+        )
         logger.info(f"{delete_count} relations deleted.")

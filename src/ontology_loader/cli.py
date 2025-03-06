@@ -1,7 +1,6 @@
 """Cli methods for ontology loading from the command line."""
 
 import logging
-import os
 
 import click
 
