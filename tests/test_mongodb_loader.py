@@ -2,14 +2,13 @@
 
 import tempfile
 from dataclasses import asdict
-
-import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 
 from ontology_loader.mongodb_loader import MongoDBLoader
 from ontology_loader.reporter import ReportWriter
 from ontology_loader.utils import load_yaml_from_package
-
+import pytest
+from unittest.mock import MagicMock
 
 @pytest.fixture()
 def schema_view():
@@ -55,31 +54,52 @@ def test_upsert_ontology_classes(schema_view):
     assert "nmdc:NC2" in ids
 
 
-def test_insert_ontology_relations(schema_view):
-    """Test inserting ontology relations."""
+@pytest.fixture(scope="function")
+def mongo_loader(schema_view):
+    """Fixture to initialize MongoDBLoader and clean the database before and after the test."""
     loader = MongoDBLoader(schema_view)
 
-    ontology_relations = [
-        asdict(
-            OntologyRelation(subject="nmdc:NC1", predicate="nmdc:is_a", object="nmdc:NC2", type="nmdc:OntologyRelation")
-        ),
-        asdict(
-            OntologyRelation(subject="nmdc:NC2", predicate="nmdc:is_a", object="nmdc:NC3", type="nmdc:OntologyRelation")
-        ),
+    # Ensure collections exist and are cleaned up before the test
+    class_collection = loader.db.get_collection("ontology_class_set")
+    relation_collection = loader.db.get_collection("ontology_relation_set")
+
+    class_collection.delete([{}])  # Use LinkML-store's delete method
+    relation_collection.delete([{}])  # Delete all records
+
+    yield loader  # Provide the loader to the test function
+
+    # Cleanup after test
+    class_collection.delete([{}])  # Delete all records
+    relation_collection.delete([{}])  # Delete all records
+
+def test_delete_obsolete_relations(mongo_loader):
+    """Test that relations involving obsolete ontology classes are deleted."""
+
+    # Insert test ontology classes using MongoDBLoader client
+    class_collection = mongo_loader.db.get_collection("ontology_class_set")
+    class_collection.insert({"id": "OBSOLETE_1", "is_obsolete": True})
+    class_collection.insert({"id": "OBSOLETE_2", "is_obsolete": True})
+    class_collection.insert({"id": "ACTIVE_1", "is_obsolete": False})  # Should NOT be deleted
+
+    # Insert test ontology relations using MongoDBLoader client
+    relation_collection = mongo_loader.db.get_collection("ontology_relation_set")
+    relation_collection.insert({"subject": "OBSOLETE_1", "predicate": "is_a", "object": "ACTIVE_1"})
+    relation_collection.insert({"subject": "ACTIVE_1", "predicate": "is_a", "object": "OBSOLETE_2"})
+    relation_collection.insert({"subject": "ACTIVE_1", "predicate": "is_a", "object": "ACTIVE_2"})  # Should NOT be deleted
+
+    # Run the deletion method
+    mongo_loader.delete_obsolete_relations()
+
+    # Extract only the rows from the query result
+    remaining_relations = relation_collection.find({}).rows
+
+    # Expected: Only the last relation should remain
+    expected_remaining = [
+        {"subject": "ACTIVE_1", "predicate": "is_a", "object": "ACTIVE_2"}
     ]
-    # creating this collection here, effectively wipes out any previous test data.
-    collection = loader.db.create_collection("test_collection", recreate_if_exists=True)
-    loader.insert_ontology_relations(ontology_relations, collection_name="test_collection")
-    query_results = collection.find({"$or": [{"subject": "nmdc:NC1"}, {"subject": "nmdc:NC2"}]})
 
-    rows = query_results.rows
-    print("query_results", query_results)
-
-    # Expected records
-    expected_records = [
-        {"subject": "nmdc:NC1", "predicate": "nmdc:is_a", "object": "nmdc:NC2", "type": "nmdc:OntologyRelation"},
-        {"subject": "nmdc:NC2", "predicate": "nmdc:is_a", "object": "nmdc:NC3", "type": "nmdc:OntologyRelation"},
-    ]
-
-    for expected_record in expected_records:
-        assert expected_record in rows
+    assert len(remaining_relations) == len(expected_remaining)
+    for relation in remaining_relations:
+        # Ensure only expected relations exist (ignoring MongoDB's internal `_id` field)
+        relation.pop("_id", None)
+        assert relation in expected_remaining
