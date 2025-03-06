@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class OntologyProcessor:
-
     """Ontology Processor class to process ontology terms and relations."""
 
     def __init__(self, ontology: str):

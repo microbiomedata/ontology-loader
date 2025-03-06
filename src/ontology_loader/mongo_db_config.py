@@ -4,7 +4,6 @@ import os
 
 
 class MongoDBConfig:
-
     """Singleton class to store default parameters accessed from client environment or sensible defaults."""
 
     _instance = None

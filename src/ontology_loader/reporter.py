@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class Report:
-
     """Class to hold report data."""
 
     def __init__(self, report_type: str, records: List[List[str]], headers: List[str]):
@@ -28,7 +27,6 @@ class Report:
 
 
 class ReportWriter:
-
     """ReportWriter class to write reports to TSV files."""
 
     @staticmethod

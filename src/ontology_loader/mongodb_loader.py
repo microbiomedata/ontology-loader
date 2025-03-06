@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class MongoDBLoader:
-
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
     def __init__(self, schema_view: Optional[SchemaView] = None):
