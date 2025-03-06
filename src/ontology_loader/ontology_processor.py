@@ -116,5 +116,5 @@ class OntologyProcessor:
                     # Convert OntologyRelation instance to a dictionary
                     ontology_relations.append(json_dumper.to_dict(ontology_relation))
 
-        # send back the ontology_relations list and covert the quick dict lookup structure back to a list
+        # send back the ontology_relations list and convert the quick dict lookup structure back to a list
         return ontology_relations, list(ontology_terms_dict.values())
