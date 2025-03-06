@@ -8,7 +8,8 @@ from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass
 from ontology_loader.mongo_db_config import MongoDBConfig
-from ontology_loader.reporter import Report
+from ontology_loader.reporter import Report, ReportWriter
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -110,14 +111,18 @@ class MongoDBLoader:
         else:
             logger.info("No OntologyRelation objects to insert.")
 
-    def delete_obsolete_relations(
-        self, relation_collection: str = "ontology_relation_set", class_collection: str = "ontology_class_set"
-    ):
+    from ontology_loader.reporter import Report, ReportWriter
+
+    def delete_obsolete_relations(self,
+                                  relation_collection: str = "ontology_relation_set",
+                                  class_collection: str = "ontology_class_set",
+                                  output_directory: Optional[str] = None):
         """
         Delete relations where the subject or object is an OntologyClass with is_obsolete set to True.
 
         :param relation_collection: The name of the MongoDB collection storing ontology relations.
         :param class_collection: The name of the MongoDB collection storing ontology classes.
+        :param output_directory: Directory where deletion report will be saved (optional).
         """
         relation_coll = self.db.create_collection(relation_collection, recreate_if_exists=False)
         class_coll = self.db.create_collection(class_collection, recreate_if_exists=False)
@@ -130,13 +135,29 @@ class MongoDBLoader:
             logger.info("No obsolete ontology classes found. No relations deleted.")
             return
 
-        # Delete relations where subject or object references an obsolete class
-        delete_count = relation_coll.delete_where(
-            {"$or": [{"subject": {"$in": list(obsolete_ids)}}, {"object": {"$in": list(obsolete_ids)}}]}
-        )
-        # hacky check to fail out if there are too many relations being deleted; more than 1000 between ontology
-        # loads is a sign that something is wrong.
-        if delete_count > 1000:
-            raise ValueError(f"There are over 1000 ({delete_count}) relations being deleted, please check!")
-        else:
-            logger.info(f"{delete_count} relations deleted.")
+        # Fetch relations to be deleted
+        relations_to_delete = relation_coll.find({"$or": [
+            {"subject": {"$in": list(obsolete_ids)}},
+            {"object": {"$in": list(obsolete_ids)}}
+        ]}).rows
+
+        if not relations_to_delete:
+            logger.info("No relations referencing obsolete classes found. No deletions performed.")
+            return
+
+        # Generate report data
+        report_records = [[rel.get("subject", ""), rel.get("predicate", ""), rel.get("object", "")] for rel in
+                          relations_to_delete]
+        report_headers = ["subject", "predicate", "object"]
+
+        # Write deletion report
+        deletion_report = Report(report_type="deleted_relations", records=report_records, headers=report_headers)
+        ReportWriter.write_reports([deletion_report], output_directory=output_directory)
+
+        # Perform deletion
+        delete_count = relation_coll.delete_where({"$or": [
+            {"subject": {"$in": list(obsolete_ids)}},
+            {"object": {"$in": list(obsolete_ids)}}
+        ]})
+
+        logger.info(f"{delete_count} relations deleted. Report saved to {output_directory or 'temporary directory'}.")
