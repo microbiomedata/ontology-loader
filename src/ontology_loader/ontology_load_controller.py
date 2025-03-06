@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class OntologyLoaderController:
+
     """
     OntologyLoader runner class for MongoDBLoader.
 
