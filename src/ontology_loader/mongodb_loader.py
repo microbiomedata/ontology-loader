@@ -134,4 +134,7 @@ class MongoDBLoader:
         delete_count = relation_coll.delete_where(
             {"$or": [{"subject": {"$in": list(obsolete_ids)}}, {"object": {"$in": list(obsolete_ids)}}]}
         )
-        logger.info(f"{delete_count} relations deleted.")
+        if delete_count > 500:
+            raise ValueError(f"There are over 500 ({delete_count}) relations being deleted, please check!")
+        else:
+            logger.info(f"{delete_count} relations deleted.")
