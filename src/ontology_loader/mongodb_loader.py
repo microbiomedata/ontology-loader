@@ -139,30 +139,29 @@ class MongoDBLoader:
         return Report("insert", insertions_report, ["subject", "predicate", "object"])
 
     def delete_obsolete_relations(
-        self,
-        relation_collection: str = "ontology_relation_set",
-        class_collection: str = "ontology_class_set",
-        output_directory: Optional[str] = None,
+            self,
+            relation_collection: str = "ontology_relation_set",
+            class_collection: str = "ontology_class_set",
+            output_directory: Optional[str] = None,
     ):
         """
         Delete relations where the subject or object is an OntologyClass with is_obsolete set to True.
-
-        :param relation_collection: The name of the MongoDB collection storing ontology relations.
-        :param class_collection: The name of the MongoDB collection storing ontology classes.
-        :param output_directory: Directory where deletion report will be saved (optional).
         """
         relation_coll = self.db.create_collection(relation_collection, recreate_if_exists=False)
         class_coll = self.db.create_collection(class_collection, recreate_if_exists=False)
 
-        # Find all ontology classes marked as obsolete
+        # Find all ontology classes explicitly marked as obsolete
         obsolete_classes = class_coll.find({"is_obsolete": True})
         obsolete_ids = {doc["id"] for doc in obsolete_classes.rows}
+
+        # Debugging
+        print("DEBUG: Obsolete IDs before relation lookup:", obsolete_ids)
 
         if not obsolete_ids:
             logger.info("No obsolete ontology classes found. No relations deleted.")
             return
 
-        # Fetch relations to be deleted
+        # Fetch relations that contain an obsolete class (but do NOT modify obsolete_ids!)
         relations_to_delete = relation_coll.find(
             {"$or": [{"subject": {"$in": list(obsolete_ids)}}, {"object": {"$in": list(obsolete_ids)}}]}
         ).rows
@@ -171,19 +170,21 @@ class MongoDBLoader:
             logger.info("No relations referencing obsolete classes found. No deletions performed.")
             return
 
-        # Generate report data
-        report_records = [
-            [rel.get("subject", ""), rel.get("predicate", ""), rel.get("object", "")] for rel in relations_to_delete
-        ]
-        report_headers = ["subject", "predicate", "object"]
+        # Debugging
+        print("DEBUG: Relations to delete:", relations_to_delete)
 
-        # Write deletion report
-        deletion_report = Report(report_type="deleted_relations", records=report_records, headers=report_headers)
-        ReportWriter.write_reports([deletion_report], output_directory=output_directory)
+        # Ensure obsolete_ids has not changed
+        print("DEBUG: Obsolete IDs before deletion filter:", obsolete_ids)
+
+        # Ensure we only delete based on the original obsolete_ids
+        deletion_filter = {
+            "$or": [
+                {"subject": {"$in": list(obsolete_ids)}},
+                {"object": {"$in": list(obsolete_ids)}}
+            ]
+        }
 
         # Perform deletion
-        delete_count = relation_coll.delete_where(
-            {"$or": [{"subject": {"$in": list(obsolete_ids)}}, {"object": {"$in": list(obsolete_ids)}}]}
-        )
+        delete_count = relation_coll.delete_where(deletion_filter)
 
         logger.info(f"{delete_count} relations deleted. Report saved to {output_directory or 'temporary directory'}.")
