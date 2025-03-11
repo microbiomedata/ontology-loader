@@ -1,10 +1,8 @@
 """Test the OntologyLoader class."""
-
+import os
 import tempfile
 from pathlib import Path
-
 import pytest
-
 from ontology_loader.mongodb_loader import MongoDBLoader
 from ontology_loader.ontology_load_controller import OntologyLoaderController
 from ontology_loader.utils import load_yaml_from_package
@@ -34,6 +32,7 @@ def ontology_loader():
     )
 
 
+@pytest.mark.skipif(os.getenv("MONGO_PASSWORD") is None, reason="Skipping test: MONGO_PASSWORD is not set")
 def test_ontology_loader_run(schema_view, ontology_loader):
     """
     Test running the ontology loader and inserting data into MongoDB.
@@ -58,7 +57,7 @@ def test_ontology_loader_run(schema_view, ontology_loader):
     relation_results = relation_collection.find({})
     assert relation_results.num_rows > 0, "No ontology relations were inserted into MongoDB"
 
-
+@pytest.mark.skipif(os.getenv("MONGO_PASSWORD") is None, reason="Skipping test: MONGO_PASSWORD is not set")
 def test_ontology_loader_reports(ontology_loader):
     """
     Test whether reports are generated after running the ontology loader.
