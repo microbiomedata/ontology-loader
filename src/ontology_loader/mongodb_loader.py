@@ -101,6 +101,7 @@ class MongoDBLoader:
         for obj in ontology_classes:
             relation_collection.delete({"subject": obj.id})  # Delete relations where the subject is the current term
 
+        # TODO: comment back in when is_obsolete is available in nmdc-schema release
         # Step 3: Handle obsolete ontology terms
         # obsolete_terms = [obj.id for obj in ontology_classes if obj.is_obsolete]
         # if obsolete_terms:
