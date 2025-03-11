@@ -1,10 +1,8 @@
 """Test MongoDB client connections from pymongo and linkml-store."""
-
+import pytest
 import os
-
 from linkml_store.api.client import Client
 from pymongo import MongoClient
-from sqlalchemy.testing import skip_if
 
 # MongoDB Connection Parameters
 MONGO_HOST = "localhost"
@@ -15,7 +13,7 @@ MONGO_PASSWORD = os.getenv("MONGO_PASSWORD", "")
 AUTH_DB = "admin"  # Authentication database
 
 
-@skip_if(os.getenv("MONGO_PASSWORD") is None, reason="Skipping test: MONGO_PASSWORD is not set")
+@pytest.mark.skipif(os.getenv("MONGO_PASSWORD") is None, reason="Skipping test: MONGO_PASSWORD is not set")
 def test_mongo_client():
     """Test MongoDB client connection from pymongo."""
     # Initialize the MongoDB client
@@ -39,7 +37,7 @@ def test_mongo_client():
     print("Inserted Record:", result)
 
 
-@skip_if(os.getenv("MONGO_PASSWORD") is None, reason="Skipping test: MONGO_PASSWORD is not set")
+@pytest.mark.skipif(os.getenv("MONGO_PASSWORD") is None, reason="Skipping test: MONGO_PASSWORD is not set")
 def test_linkmlstore_client():
     """Test the MongoDB client connection from linkml-store."""
     client = Client(
