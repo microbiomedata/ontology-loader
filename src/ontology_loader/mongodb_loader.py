@@ -115,6 +115,8 @@ class MongoDBLoader:
         # Step 4: Re-populate relations, ensuring valid data
         insertions_report_relations = []
         for relation in ontology_relations:
+            if type(relation) == OntologyRelation:
+                relation = asdict(relation)
             if not relation.get("subject") or not relation.get("predicate") or not relation.get("object"):
                 logging.warning(f"Skipping invalid relation: {relation}")
                 continue

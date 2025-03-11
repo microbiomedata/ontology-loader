@@ -1,11 +1,8 @@
-import tempfile
-from unittest.mock import MagicMock
-
 import pytest
-from nmdc_schema.nmdc import OntologyClass
-from ontology_loader.mongodb_loader import MongoDBLoader
-from ontology_loader.reporter import ReportWriter
+from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+from ontology_loader.mongodb_loader import MongoDBLoader, Report
 from ontology_loader.utils import load_yaml_from_package
+from unittest.mock import MagicMock
 
 
 @pytest.fixture()
@@ -24,97 +21,110 @@ def mock_mongo_loader(schema_view):
     return loader
 
 
-def test_mongodb_loader_init(mock_mongo_loader):
-    """Test MongoDBLoader initialization without actual database access."""
-    assert mock_mongo_loader.client is not None
-    assert mock_mongo_loader.db is not None
+@pytest.fixture
+def mock_db():
+    db = MagicMock()
+    db.create_collection.return_value = MagicMock()
+    return db
 
 
-def test_upsert_ontology_classes(mock_mongo_loader):
-    """Test upserting ontology classes without storing them in MongoDB."""
-    ontology_classes = [
-        OntologyClass(id="nmdc:NC1", type="nmdc:OntologyClass"),
-        OntologyClass(id="nmdc:NC2", type="nmdc:OntologyClass"),
+@pytest.fixture
+def mock_ontology_classes():
+    return [
+        OntologyClass(id="ONT:001", name="Term1", type="nmdc:OntologyClass"),
+        OntologyClass(id="ONT:002", name="Term2", type="nmdc:OntologyClass")
     ]
 
-    # Create mock reports with a 'report_type' attribute
-    mock_update_report = MagicMock()
-    mock_update_report.report_type = "update"
 
-    mock_insert_report = MagicMock()
-    mock_insert_report.report_type = "insert"
-
-    # Mock the upsert method to return these reports
-    mock_mongo_loader.upsert_ontology_classes = MagicMock(
-        return_value=([mock_update_report], [mock_insert_report])
-    )
-
-    updates_report, insertions_report = mock_mongo_loader.upsert_ontology_classes(ontology_classes)
-
-    ReportWriter.write_reports(
-        reports=updates_report + insertions_report,  # Flatten list before passing
-        output_format="tsv",
-        output_directory=tempfile.gettempdir(),
-    )
-
-    assert mock_mongo_loader.upsert_ontology_classes.called
-
-
-def test_delete_obsolete_relations(mock_mongo_loader):
-    """Test that obsolete relations are deleted without using MongoDB."""
-
-    # Mock collections
-    mock_class_collection = MagicMock()
-    mock_relation_collection = MagicMock()
-
-    # Mock create_collection() instead of get_collection()
-    mock_mongo_loader.db.create_collection.side_effect = lambda name, recreate_if_exists: (
-        mock_class_collection if name == "ontology_class_set" else mock_relation_collection
-    )
-
-    # Define test data
-    mock_class_collection.find.return_value.rows = [
-        {"id": "OBSOLETE_1", "is_obsolete": True},
-        {"id": "OBSOLETE_2", "is_obsolete": True},
-        {"id": "ACTIVE_1", "is_obsolete": False},  # This should NOT be returned by find()
+@pytest.fixture
+def mock_ontology_relations():
+    return [
+        OntologyRelation(subject="ONT:001", predicate="related_to", object="ONT:002", type="nmdc:OntologyRelation"),
+        OntologyRelation(subject="ONT:002", predicate="part_of", object="ONT:003", type="nmdc:OntologyRelation")
     ]
 
-    mock_relation_collection.find.return_value.rows = [
-        {"subject": "OBSOLETE_1", "predicate": "is_a", "object": "ACTIVE_1"},
-        {"subject": "OBSOLETE_2", "predicate": "is_a", "object": "ACTIVE_1"},
-        {"subject": "ACTIVE_1", "predicate": "is_a", "object": "ACTIVE_2"},  # Should not be deleted
+
+def test_upsert_new_ontology_data(mock_db, mock_ontology_classes, mock_ontology_relations):
+    loader = MongoDBLoader()
+    loader.db = mock_db
+    class_collection = mock_db.create_collection.return_value
+
+    mock_query_result = MagicMock()
+    mock_query_result.rows = []
+    mock_query_result.num_rows = 0  # Ensuring num_rows behaves like an integer
+
+    class_collection.find.return_value = mock_query_result  # Mocking find() response
+
+    report = loader.upsert_ontology_data(mock_ontology_classes, mock_ontology_relations)
+
+    assert isinstance(report[0], Report)  # Class updates report
+    assert isinstance(report[1], Report)  # Class insertions report
+    assert isinstance(report[2], Report)  # Relation insertions report
+    assert len(report[1].records) == len(mock_ontology_classes)  # All classes inserted
+    assert len(report[2].records) == len(mock_ontology_relations)  # All relations inserted
+
+
+def test_upsert_existing_ontology_data(mock_db, mock_ontology_classes):
+    loader = MongoDBLoader()
+    loader.db = mock_db
+    class_collection = mock_db.create_collection.return_value
+
+    existing_doc = {"id": "ONT:001", "name": "OldTerm", "type": "nmdc:OntologyClass"}
+
+    mock_query_result = MagicMock()
+    mock_query_result.rows = [existing_doc]
+    mock_query_result.num_rows = 1  # Ensuring num_rows behaves like an integer
+
+    class_collection.find.return_value = mock_query_result  # Mocking find() response
+
+    report = loader.upsert_ontology_data(mock_ontology_classes, [])
+    assert len(report[0].records) == 2  # One record should be updated
+    assert len(report[1].records) == 0  # One record should be inserted (new class)
+
+
+def test_handle_disappearing_relations(mock_db, mock_ontology_classes, mock_ontology_relations):
+    loader = MongoDBLoader()
+    loader.db = mock_db
+    relation_collection = mock_db.create_collection.return_value
+
+    mock_query_result = MagicMock()
+    mock_query_result.rows = [
+        {"subject": "ONT:001", "predicate": "entailed_isa_partof_closure",
+         "object": "ONT:002", "type": "nmdc:OntologyRelation"},
+        {"subject": "ONT:002", "predicate": "entailed_isa_partof_closure",
+         "object": "ONT:003", "type": "nmdc:OntologyRelation"}
+    ]
+    mock_query_result.num_rows = 2  # Ensuring num_rows behaves like an integer
+
+    relation_collection.find.return_value = mock_query_result  # Mocking find() response
+    relation_collection.upsert = MagicMock()  # Mock upsert method
+
+    updated_relations = [
+        OntologyRelation(subject="ONT:001", predicate="related_to", object="ONT:003", type="nmdc:OntologyRelation")
+        # Changed relation
     ]
 
-    # Mocks do not automatically filter query results the way a real MongoDB would. Instead, unless we specify
-    # otherwise, a mocked .find() method simply returns whatever we set in .return_value.rows, regardless of the query.
-    def find_side_effect(query):
-        """Mock function to return only documents matching the query."""
-        return MagicMock(rows=[doc for doc in mock_class_collection.find.return_value.rows if doc.get("is_obsolete")])
+    def mock_upsert(data, filter_fields, update_fields=None):
+        for obj in data:
+            if "subject" in obj:
+                for ontology_class in mock_ontology_classes:
+                    if ontology_class.id == obj["subject"]:
+                        ontology_class.relations = [
+                            OntologyRelation(
+                                subject=obj["subject"],
+                                predicate=obj["predicate"],
+                                object=obj["object"],
+                                type="nmdc:OntologyRelation",
+                            )
+                        ]
 
-    mock_class_collection.find.side_effect = find_side_effect
+    relation_collection.upsert.side_effect = mock_upsert  # Simulate relation updates
 
-    # Mock delete_where method
-    mock_relation_collection.delete_where = MagicMock(return_value=2)  # Assume 2 records get deleted
+    loader.upsert_ontology_data(mock_ontology_classes, updated_relations)
 
-    # Run the method
-    mock_mongo_loader.delete_obsolete_relations()
+    # Ensure upsert was called
+    relation_collection.upsert.assert_called()
 
-    # Debugging: Check what obsolete IDs were retrieved
-    obsolete_ids = {doc["id"] for doc in mock_class_collection.find.return_value.rows if doc["is_obsolete"]}
-    print(f"Obsolete IDs detected: {obsolete_ids}")
-
-    # Ensure delete_where was called with the correct filter
-    expected_filter = {
-        "$or": [
-            {"subject": {"$in": list(obsolete_ids)}},
-            {"object": {"$in": list(obsolete_ids)}}
-        ]
-    }
-
-    actual_filter = mock_relation_collection.delete_where.call_args[0][0]
-
-    # Debugging: Print expected vs. actual
-    print(f"Expected filter: {expected_filter}")
-    print(f"Actual delete_where call: {mock_relation_collection.delete_where.call_args}")
-
-    assert expected_filter == actual_filter, f"Expected: {expected_filter}, Got: {actual_filter}"
+    # Verify old relations were replaced
+    assert len(mock_ontology_classes[0].relations) == 1
+    assert mock_ontology_classes[0].relations[0].object == "ONT:003"

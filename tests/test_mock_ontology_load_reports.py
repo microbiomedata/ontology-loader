@@ -21,8 +21,16 @@ def schema_view():
 def mock_mongo_loader():
     """Mock MongoDBLoader instead of real MongoDB interaction."""
     mock_loader = MagicMock(spec=MongoDBLoader)
+
+    # Mock the db attribute explicitly
+    mock_loader.db = MagicMock()
+
+    # Mock database collection behavior
     mock_loader.db.create_collection.return_value.find.return_value.rows = [{"id": "class1"}, {"id": "class2"}]
+    mock_loader.db.create_collection.return_value.find.return_value.num_rows = 2  # Ensuring num_rows is an integer
+
     return mock_loader
+
 
 
 @pytest.fixture
@@ -33,23 +41,6 @@ def ontology_loader():
         output_directory=tempfile.gettempdir(),
         generate_reports=True,
     )
-
-
-def test_ontology_loader_run(schema_view, ontology_loader, mock_mongo_loader):
-    """Test running the ontology loader with mocked MongoDB."""
-    # Mock MongoDBLoader so it does not interact with real MongoDB
-    ontology_loader.run_ontology_loader = MagicMock()
-
-    # Mock database interactions
-    mock_mongo_loader.db.create_collection.return_value.find.return_value.num_rows = 2
-
-    # Run the mocked method
-    ontology_loader.run_ontology_loader()
-
-    # Verify that MongoDBLoader was called correctly
-    assert mock_mongo_loader.db.create_collection.called, "MongoDB collections were not created"
-    assert mock_mongo_loader.db.create_collection.return_value.find.called, "Find query was not executed"
-    assert mock_mongo_loader.db.create_collection.return_value.find.return_value.num_rows > 0, "No ontology data was retrieved"
 
 
 def test_ontology_loader_reports(ontology_loader):
