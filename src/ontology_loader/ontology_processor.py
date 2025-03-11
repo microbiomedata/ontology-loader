@@ -99,9 +99,7 @@ class OntologyProcessor:
                 # Convert generator to list
                 ancestors_list = list(self.adapter.ancestors(entity, reflexive=True, predicates=predicates))
                 # Filter to keep only ENVO terms
-                filtered_ancestors = list(set(a for a in ancestors_list
-                                                if a.startswith(self.ontology.upper() + ":")
-                                                ))
+                filtered_ancestors = list(set(a for a in ancestors_list if a.startswith(self.ontology.upper() + ":")))
 
                 for ancestor in filtered_ancestors:
                     ontology_relation = OntologyRelation(

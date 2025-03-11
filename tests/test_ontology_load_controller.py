@@ -12,13 +12,21 @@ from ontology_loader.utils import load_yaml_from_package
 
 @pytest.fixture
 def schema_view():
-    """Load the NMDC schema view."""
+    """
+    Load the NMDC schema view.
+
+    :return: NMDC schema, schemaview object.
+    """
     return load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
 
 
 @pytest.fixture
 def ontology_loader():
-    """Initialize the OntologyLoader with test parameters."""
+    """
+    Initialize the OntologyLoader with test parameters.
+
+    :return: OntologyLoaderController instance.
+    """
     return OntologyLoaderController(
         source_ontology="envo",
         output_directory=tempfile.gettempdir(),
@@ -27,7 +35,12 @@ def ontology_loader():
 
 
 def test_ontology_loader_run(schema_view, ontology_loader):
-    """Test running the ontology loader and inserting data into MongoDB."""
+    """
+    Test running the ontology loader and inserting data into MongoDB.
+
+    :param schema_view: NMDC schema view.
+    :param ontology_loader: OntologyLoaderController instance.
+    """
     ontology_loader.run_ontology_loader()
 
     # Connect to MongoDB and verify inserted data
@@ -47,7 +60,11 @@ def test_ontology_loader_run(schema_view, ontology_loader):
 
 
 def test_ontology_loader_reports(ontology_loader):
-    """Test whether reports are generated after running the ontology loader."""
+    """
+    Test whether reports are generated after running the ontology loader.
+
+    :param ontology_loader: OntologyLoaderController instance.
+    """
     ontology_loader.run_ontology_loader()
 
     # Verify reports exist in the output directory

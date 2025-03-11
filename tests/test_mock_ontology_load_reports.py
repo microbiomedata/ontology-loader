@@ -13,13 +13,21 @@ from ontology_loader.utils import load_yaml_from_package
 
 @pytest.fixture
 def schema_view():
-    """Load the NMDC schema view."""
+    """
+    Load the NMDC schema view.
+
+    :return: NMDC schema, schemaview object.
+    """
     return load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
 
 
 @pytest.fixture
 def mock_mongo_loader():
-    """Mock MongoDBLoader instead of real MongoDB interaction."""
+    """
+    Mock MongoDBLoader instead of real MongoDB interaction.
+
+    :return: MongoDBLoader instance.
+    """
     mock_loader = MagicMock(spec=MongoDBLoader)
 
     # Mock the db attribute explicitly
@@ -32,10 +40,13 @@ def mock_mongo_loader():
     return mock_loader
 
 
-
 @pytest.fixture
 def ontology_loader():
-    """Initialize the OntologyLoader with test parameters."""
+    """
+    Initialize the OntologyLoader with test parameters.
+
+    :return: OntologyLoaderController instance.
+    """
     return OntologyLoaderController(
         source_ontology="envo",
         output_directory=tempfile.gettempdir(),
@@ -44,7 +55,11 @@ def ontology_loader():
 
 
 def test_ontology_loader_reports(ontology_loader):
-    """Test whether reports are generated after running the ontology loader (mocked)."""
+    """
+    Test whether reports are generated after running the ontology loader (mocked).
+
+    :param ontology_loader: OntologyLoaderController instance.
+    """
     ontology_loader.run_ontology_loader = MagicMock()
 
     # Run the mocked method

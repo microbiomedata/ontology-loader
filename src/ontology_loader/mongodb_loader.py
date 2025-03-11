@@ -10,7 +10,7 @@ from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 
 from ontology_loader.mongo_db_config import MongoDBConfig
-from ontology_loader.reporter import Report, ReportWriter
+from ontology_loader.reporter import Report
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -53,11 +53,14 @@ class MongoDBLoader:
         logger.info(f"Connected to MongoDB: {self.db}")
 
     def upsert_ontology_data(
-            self, ontology_classes: List[OntologyClass], ontology_relations: List[OntologyRelation],
-            class_collection_name: str = "ontology_class_set", relation_collection_name: str = "ontology_relation_set"
+        self,
+        ontology_classes: List[OntologyClass],
+        ontology_relations: List[OntologyRelation],
+        class_collection_name: str = "ontology_class_set",
+        relation_collection_name: str = "ontology_relation_set",
     ):
         """
-        Upsert ontology terms, clear and re-populate ontology relations, handle obsolescence, and manage hierarchy changes.
+        Upsert ontology terms, clear/re-populate ontology relations, handle obsolescence, and manage hierarchy changes.
 
         :param ontology_classes: A list of OntologyClass objects to upsert.
         :param ontology_relations: A list of OntologyRelation objects to upsert.
@@ -84,8 +87,9 @@ class MongoDBLoader:
                     key: getattr(obj, key) for key in ontology_fields if getattr(obj, key) != existing_doc.get(key)
                 }
                 if updated_fields:
-                    class_collection.upsert([asdict(obj)], filter_fields=["id"],
-                                            update_fields=list(updated_fields.keys()))
+                    class_collection.upsert(
+                        [asdict(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys())
+                    )
                     logging.debug(f"Updated OntologyClass (id={obj.id}): {updated_fields}")
                     updates_report.append([obj.id] + [getattr(obj, field, "") for field in ontology_fields])
             else:
@@ -115,24 +119,22 @@ class MongoDBLoader:
         # Step 4: Re-populate relations, ensuring valid data
         insertions_report_relations = []
         for relation in ontology_relations:
-            if type(relation) == OntologyRelation:
+            if type(relation) is OntologyRelation:
                 relation = asdict(relation)
             if not relation.get("subject") or not relation.get("predicate") or not relation.get("object"):
                 logging.warning(f"Skipping invalid relation: {relation}")
                 continue
-
-            if type(relation) == OntologyRelation:
-                relation_dict = asdict(relation)
             else:
                 relation_dict = relation
             relation_collection.upsert([relation_dict], filter_fields=["subject", "predicate", "object"])
             logging.debug(f"Inserted OntologyRelation: {relation_dict}")
-            insertions_report_relations.append([relation.get("subject"),
-                                                relation.get("predicate"),
-                                                relation.get("object")])
+            insertions_report_relations.append(
+                [relation.get("subject"), relation.get("predicate"), relation.get("object")]
+            )
 
         logging.info(
-            f"Finished upserting ontology data: {len(ontology_classes)} classes, {len(ontology_relations)} relations.")
+            f"Finished upserting ontology data: {len(ontology_classes)} classes, {len(ontology_relations)} relations."
+        )
         return (
             Report("update", updates_report, ontology_fields),
             Report("insert", insertions_report, ontology_fields),

@@ -1,8 +1,12 @@
+"""Tests for the MongoDBLoader class with mocked database interactions."""
+
+from unittest.mock import MagicMock
+
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+
 from ontology_loader.mongodb_loader import MongoDBLoader, Report
 from ontology_loader.utils import load_yaml_from_package
-from unittest.mock import MagicMock
 
 
 @pytest.fixture()
@@ -23,6 +27,11 @@ def mock_mongo_loader(schema_view):
 
 @pytest.fixture
 def mock_db():
+    """
+    Mock database.
+
+    :return: Mock database.
+    """
     db = MagicMock()
     db.create_collection.return_value = MagicMock()
     return db
@@ -30,21 +39,38 @@ def mock_db():
 
 @pytest.fixture
 def mock_ontology_classes():
+    """
+    Mock ontology classes.
+
+    :return: List of OntologyClass objects.
+    """
     return [
         OntologyClass(id="ONT:001", name="Term1", type="nmdc:OntologyClass"),
-        OntologyClass(id="ONT:002", name="Term2", type="nmdc:OntologyClass")
+        OntologyClass(id="ONT:002", name="Term2", type="nmdc:OntologyClass"),
     ]
 
 
 @pytest.fixture
 def mock_ontology_relations():
+    """
+    Mock ontology relations.
+
+    :return: List of OntologyRelation objects.
+    """
     return [
         OntologyRelation(subject="ONT:001", predicate="related_to", object="ONT:002", type="nmdc:OntologyRelation"),
-        OntologyRelation(subject="ONT:002", predicate="part_of", object="ONT:003", type="nmdc:OntologyRelation")
+        OntologyRelation(subject="ONT:002", predicate="part_of", object="ONT:003", type="nmdc:OntologyRelation"),
     ]
 
 
 def test_upsert_new_ontology_data(mock_db, mock_ontology_classes, mock_ontology_relations):
+    """
+    Test upserting new ontology data.
+
+    :param mock_db: Mock database.
+    :param mock_ontology_classes: Mock ontology classes.
+    :param mock_ontology_relations: Mock ontology relations.
+    """
     loader = MongoDBLoader()
     loader.db = mock_db
     class_collection = mock_db.create_collection.return_value
@@ -65,6 +91,12 @@ def test_upsert_new_ontology_data(mock_db, mock_ontology_classes, mock_ontology_
 
 
 def test_upsert_existing_ontology_data(mock_db, mock_ontology_classes):
+    """
+    Test upserting existing ontology data.
+
+    :param mock_db: Mock database.
+    :param mock_ontology_classes: Mock ontology classes.
+    """
     loader = MongoDBLoader()
     loader.db = mock_db
     class_collection = mock_db.create_collection.return_value
@@ -83,16 +115,31 @@ def test_upsert_existing_ontology_data(mock_db, mock_ontology_classes):
 
 
 def test_handle_disappearing_relations(mock_db, mock_ontology_classes, mock_ontology_relations):
+    """
+    Test handling of disappearing relations.
+
+    :param mock_db: Mock database.
+    :param mock_ontology_classes: Mock ontology classes.
+    :param mock_ontology_relations: Mock ontology relations.
+    """
     loader = MongoDBLoader()
     loader.db = mock_db
     relation_collection = mock_db.create_collection.return_value
 
     mock_query_result = MagicMock()
     mock_query_result.rows = [
-        {"subject": "ONT:001", "predicate": "entailed_isa_partof_closure",
-         "object": "ONT:002", "type": "nmdc:OntologyRelation"},
-        {"subject": "ONT:002", "predicate": "entailed_isa_partof_closure",
-         "object": "ONT:003", "type": "nmdc:OntologyRelation"}
+        {
+            "subject": "ONT:001",
+            "predicate": "entailed_isa_partof_closure",
+            "object": "ONT:002",
+            "type": "nmdc:OntologyRelation",
+        },
+        {
+            "subject": "ONT:002",
+            "predicate": "entailed_isa_partof_closure",
+            "object": "ONT:003",
+            "type": "nmdc:OntologyRelation",
+        },
     ]
     mock_query_result.num_rows = 2  # Ensuring num_rows behaves like an integer
 
@@ -105,6 +152,13 @@ def test_handle_disappearing_relations(mock_db, mock_ontology_classes, mock_onto
     ]
 
     def mock_upsert(data, filter_fields, update_fields=None):
+        """
+        Simulate relation updates.
+
+        :param data: Data to upsert.
+        :param filter_fields: Fields to filter on.
+        :param update_fields: Fields to update.
+        """
         for obj in data:
             if "subject" in obj:
                 for ontology_class in mock_ontology_classes:
