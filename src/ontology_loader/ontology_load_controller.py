@@ -34,7 +34,6 @@ class OntologyLoaderController:
 
     def run_ontology_loader(self):
         """Run the OntologyLoader and insert data into MongoDB."""
-        logging.info(f"Processing ontology: {self.source_ontology}")
 
         # Load Schema View
         nmdc_sv = load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
@@ -58,16 +57,17 @@ class OntologyLoaderController:
         logger.info(f"Db port {db_manager.db_port}")
         logger.info(f"MongoDB host {db_manager.db_host}")
 
-        # Insert data into MongoDB
-        updates_report, insertions_report = db_manager.upsert_ontology_classes(ontology_classes_relations)
-        # Delete obsolete relations and insert new relations
-        db_manager.delete_obsolete_relations()
-        db_manager.upsert_ontology_relations(ontology_relations)
+        # Update data
+        updates_report, insertions_report, insert_relations_report = (
+            db_manager.upsert_ontology_data(ontology_classes_relations, ontology_relations)
+        )
 
         # Optionally write job reports
         if self.generate_reports:
             ReportWriter.write_reports(
-                reports=[updates_report, insertions_report], output_format="tsv", output_directory=self.output_directory
+                reports=[updates_report, insertions_report, insert_relations_report],
+                output_format="tsv",
+                output_directory=self.output_directory
             )
 
         logger.info("Processing complete. Data inserted into MongoDB.")

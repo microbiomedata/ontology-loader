@@ -98,14 +98,15 @@ class OntologyProcessor:
             if entity.startswith(self.ontology.upper() + ":"):
                 # Convert generator to list
                 ancestors_list = list(self.adapter.ancestors(entity, reflexive=True, predicates=predicates))
-
                 # Filter to keep only ENVO terms
-                filtered_ancestors = list(set(a for a in ancestors_list if a.startswith(self.ontology.upper() + ":")))
+                filtered_ancestors = list(set(a for a in ancestors_list
+                                                if a.startswith(self.ontology.upper() + ":")
+                                                ))
 
                 for ancestor in filtered_ancestors:
                     ontology_relation = OntologyRelation(
                         subject=entity,
-                        predicate="is_a",  # TODO: fix this to the real predicate that it came with
+                        predicate="entailed_isa_partof_closure",
                         object=ancestor,
                         type="nmdc:OntologyRelation",
                     )
