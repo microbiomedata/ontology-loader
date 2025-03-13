@@ -1,6 +1,8 @@
 """Test MongoDB client connections from pymongo and linkml-store."""
-import pytest
+
 import os
+
+import pytest
 from linkml_store.api.client import Client
 from pymongo import MongoClient
 

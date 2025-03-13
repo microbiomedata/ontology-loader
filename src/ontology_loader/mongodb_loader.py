@@ -36,8 +36,7 @@ def _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection
             class_collection.upsert([asdict(term_obj)], filter_fields=["id"])
             logging.debug(f"Marked OntologyClass {term_id} as obsolete and cleared relations.")
 
-    relation_collection.delete(
-        {"$or": [{"subject": {"$in": obsolete_terms}}, {"object": {"$in": obsolete_terms}}]})
+    relation_collection.delete({"$or": [{"subject": {"$in": obsolete_terms}}, {"object": {"$in": obsolete_terms}}]})
     logging.debug("Removed relations referencing obsolete terms.")
 
 
@@ -80,9 +79,7 @@ def _upsert_ontology_class(obj, collection, ontology_fields):
             key: getattr(obj, key) for key in ontology_fields if getattr(obj, key) != existing_doc.get(key)
         }
         if updated_fields:
-            collection.upsert(
-                [asdict(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys())
-            )
+            collection.upsert([asdict(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys()))
             logging.debug(f"Updated OntologyClass (id={obj.id}): {updated_fields}")
             return True, report_row
     else:
@@ -161,7 +158,7 @@ class MongoDBLoader:
             elif was_updated is False:  # Not None, but False (new insertion)
                 insertions_report.append(report_row)
 
-        # Step 2: Clear ontology term relations for each term 
+        # Step 2: Clear ontology term relations for each term
         for obj in ontology_classes:
             relation_collection.delete({"subject": obj.id})
 
