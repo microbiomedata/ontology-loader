@@ -16,6 +16,83 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+def _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection):
+    """
+    Handle obsolete ontology terms by updating their status and removing relations.
+
+    :param obsolete_terms: List of obsolete term IDs
+    :param class_collection: MongoDB collection for classes
+    :param relation_collection: MongoDB collection for relations
+    """
+    if not obsolete_terms:
+        return
+
+    for term_id in obsolete_terms:
+        term = class_collection.find({"id": term_id}).rows
+        if term:
+            term_obj = term[0]
+            term_obj.relations = []
+            term_obj.is_obsolete = True
+            class_collection.upsert([asdict(term_obj)], filter_fields=["id"])
+            logging.debug(f"Marked OntologyClass {term_id} as obsolete and cleared relations.")
+
+    relation_collection.delete(
+        {"$or": [{"subject": {"$in": obsolete_terms}}, {"object": {"$in": obsolete_terms}}]})
+    logging.debug("Removed relations referencing obsolete terms.")
+
+
+def _upsert_relation(relation, collection):
+    """
+    Upsert a single relation and return report data if valid.
+
+    :param relation: OntologyRelation object to upsert
+    :param collection: MongoDB collection for relations
+    :return: List with relation data or None if invalid
+    """
+    if type(relation) is OntologyRelation:
+        relation = asdict(relation)
+
+    if not relation.get("subject") or not relation.get("predicate") or not relation.get("object"):
+        logging.warning(f"Skipping invalid relation: {relation}")
+        return None
+
+    collection.upsert([relation], filter_fields=["subject", "predicate", "object"])
+    logging.debug(f"Inserted OntologyRelation: {relation}")
+    return [relation.get("subject"), relation.get("predicate"), relation.get("object")]
+
+
+def _upsert_ontology_class(obj, collection, ontology_fields):
+    """
+    Upsert a single ontology class and return update report data.
+
+    :param obj: OntologyClass object to upsert
+    :param collection: MongoDB collection for classes
+    :param ontology_fields: List of field names for OntologyClass
+    :return: Tuple of (was_updated, report_row)
+    """
+    filter_criteria = {"id": obj.id}
+    query_result = collection.find(filter_criteria)
+    existing_doc = query_result.rows[0] if query_result.num_rows > 0 else None
+    report_row = [obj.id] + [getattr(obj, field, "") for field in ontology_fields]
+
+    if existing_doc:
+        updated_fields = {
+            key: getattr(obj, key) for key in ontology_fields if getattr(obj, key) != existing_doc.get(key)
+        }
+        if updated_fields:
+            collection.upsert(
+                [asdict(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys())
+            )
+            logging.debug(f"Updated OntologyClass (id={obj.id}): {updated_fields}")
+            return True, report_row
+    else:
+        collection.upsert([asdict(obj)], filter_fields=["id"], update_fields=ontology_fields)
+        logging.debug(f"Inserted OntologyClass (id={obj.id}).")
+        return False, report_row
+
+    return None, None
+
+
 class MongoDBLoader:
 
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
@@ -78,60 +155,26 @@ class MongoDBLoader:
         ontology_fields = [field.name for field in fields(OntologyClass)]
 
         for obj in ontology_classes:
-            filter_criteria = {"id": obj.id}
-            query_result = class_collection.find(filter_criteria)
-            existing_doc = query_result.rows[0] if query_result.num_rows > 0 else None
+            was_updated, report_row = _upsert_ontology_class(obj, class_collection, ontology_fields)
+            if was_updated:
+                updates_report.append(report_row)
+            elif was_updated is False:  # Not None, but False (new insertion)
+                insertions_report.append(report_row)
 
-            if existing_doc:
-                updated_fields = {
-                    key: getattr(obj, key) for key in ontology_fields if getattr(obj, key) != existing_doc.get(key)
-                }
-                if updated_fields:
-                    class_collection.upsert(
-                        [asdict(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys())
-                    )
-                    logging.debug(f"Updated OntologyClass (id={obj.id}): {updated_fields}")
-                    updates_report.append([obj.id] + [getattr(obj, field, "") for field in ontology_fields])
-            else:
-                class_collection.upsert([asdict(obj)], filter_fields=["id"], update_fields=ontology_fields)
-                logging.debug(f"Inserted OntologyClass (id={obj.id}).")
-                insertions_report.append([obj.id] + [getattr(obj, field, "") for field in ontology_fields])
-
-        # Step 2: Clear ontology term relations for each term individually
+        # Step 2: Clear ontology term relations for each term 
         for obj in ontology_classes:
-            relation_collection.delete({"subject": obj.id})  # Delete relations where the subject is the current term
+            relation_collection.delete({"subject": obj.id})
 
-        # TODO: comment back in when is_obsolete is available in nmdc-schema release
         # Step 3: Handle obsolete ontology terms
-        # obsolete_terms = [obj.id for obj in ontology_classes if obj.is_obsolete]
-        # if obsolete_terms:
-        #     for term_id in obsolete_terms:
-        #         term = class_collection.find({"id": term_id}).rows
-        #         if term:
-        #             term_obj = term[0]
-        #             term_obj.relations = []
-        #             term_obj.is_obsolete = True
-        #             class_collection.upsert([asdict(term_obj)], filter_fields=["id"])
-        #             logging.debug(f"Marked OntologyClass {term_id} as obsolete and cleared relations.")
-        #     relation_collection.delete(
-        #         {"$or": [{"subject": {"$in": obsolete_terms}}, {"object": {"$in": obsolete_terms}}]})
-        #     logging.debug(f"Removed relations referencing obsolete terms.")
+        obsolete_terms = [obj.id for obj in ontology_classes if obj.is_obsolete]
+        _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection)
 
-        # Step 4: Re-populate relations, ensuring valid data
+        # Step 4: Re-populate relations
         insertions_report_relations = []
         for relation in ontology_relations:
-            if type(relation) is OntologyRelation:
-                relation = asdict(relation)
-            if not relation.get("subject") or not relation.get("predicate") or not relation.get("object"):
-                logging.warning(f"Skipping invalid relation: {relation}")
-                continue
-            else:
-                relation_dict = relation
-            relation_collection.upsert([relation_dict], filter_fields=["subject", "predicate", "object"])
-            logging.debug(f"Inserted OntologyRelation: {relation_dict}")
-            insertions_report_relations.append(
-                [relation.get("subject"), relation.get("predicate"), relation.get("object")]
-            )
+            relation_data = _upsert_relation(relation, relation_collection)
+            if relation_data:
+                insertions_report_relations.append(relation_data)
 
         logging.info(
             f"Finished upserting ontology data: {len(ontology_classes)} classes, {len(ontology_relations)} relations."
