@@ -1,11 +1,10 @@
 """Tests for the MongoDBLoader class with mocked database interactions."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 
-import ontology_loader.mongodb_loader
 from ontology_loader.mongodb_loader import MongoDBLoader, Report, _handle_obsolete_terms
 from ontology_loader.utils import load_yaml_from_package
 
@@ -209,24 +208,22 @@ def test_handle_obsolete_terms_function(mock_db):
     relation_collection = mock_db.create_collection.return_value
 
     # Create a proper OntologyClass object
-    term_obj = OntologyClass(id="ONT:001",
-                             name="Term1",
-                             type="nmdc:OntologyClass",
-                             is_obsolete=False)
+    term_obj = OntologyClass(id="ONT:001", name="Term1", type="nmdc:OntologyClass", is_obsolete=False)
     term_obj.relations = ["some_relation"]  # Add relations attribute
-    
+
     # Set up the find method to return the term_obj
     mock_query_result = MagicMock()
     mock_query_result.rows = [term_obj]
     mock_query_result.num_rows = 1
     class_collection.find.return_value = mock_query_result
-    
+
     # Capture what gets passed to upsert to verify changes
     upserted_data = None
+
     def capture_upsert(data, filter_fields, update_fields=None):
         nonlocal upserted_data
         upserted_data = data[0] if data else None
-    
+
     class_collection.upsert.side_effect = capture_upsert
 
     # Test with list of obsolete terms
@@ -238,7 +235,7 @@ def test_handle_obsolete_terms_function(mock_db):
     assert upserted_data is not None, "No data was passed to upsert"
     assert upserted_data["is_obsolete"] is True, "Term was not marked as obsolete"
     assert upserted_data["relations"] == [], "Relations were not cleared"
-    
+
     # Verify class collection upsert was called
     class_collection.upsert.assert_called()
 
@@ -269,18 +266,19 @@ def test_upsert_ontology_data_with_obsolete_terms(mock_db, mock_obsolete_classes
         mock_result.rows = []
         mock_result.num_rows = 0
         return mock_result
-    
+
     class_collection.find.side_effect = mock_find
-    
+
     # Setup captured data for upserting
     upserted_data = []
+
     def capture_upsert(data, filter_fields, update_fields=None):
         nonlocal upserted_data
         if data and isinstance(data, list):
             upserted_data.extend(data)
-    
+
     class_collection.upsert.side_effect = capture_upsert
-    
+
     # Configure relation collection delete method
     relation_collection.delete = MagicMock()
 

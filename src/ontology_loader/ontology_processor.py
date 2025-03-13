@@ -84,7 +84,7 @@ class OntologyProcessor:
                     alternative_names=self.adapter.entity_aliases(obolete_entity) or [],
                     definition=self.adapter.definition(obolete_entity) or "",
                     relations=[],
-                    is_obsolete=True
+                    is_obsolete=True,
                 )
 
                 ontology_classes.append(ontology_class)
