@@ -8,6 +8,7 @@ from typing import List, Optional
 from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+from oaklib import get_adapter
 
 from ontology_loader.mongo_db_config import MongoDBConfig
 from ontology_loader.reporter import Report
@@ -28,12 +29,16 @@ def _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection
         return
 
     for term_id in obsolete_terms:
-        term = class_collection.find({"id": term_id}).rows
-        if term:
-            term_obj = term[0]
-            term_obj.relations = []
-            term_obj.is_obsolete = True
-            class_collection.upsert([asdict(term_obj)], filter_fields=["id"])
+        if len(class_collection.find({"id": term_id}).rows) > 1:
+            logging.warning(f"Multiple entries found for OntologyClass {term_id}.")
+
+        if len(class_collection.find({"id": term_id}).rows) == 1:
+            term = class_collection.find({"id": term_id}).rows[0]
+            if type(term) is OntologyClass:
+                term = asdict(term)
+            term["relations"] = []
+            term["is_obsolete"] = True
+            class_collection.upsert([term], filter_fields=["id"], update_fields=["is_obsolete", "relations"])
             logging.debug(f"Marked OntologyClass {term_id} as obsolete and cleared relations.")
 
     relation_collection.delete({"$or": [{"subject": {"$in": obsolete_terms}}, {"object": {"$in": obsolete_terms}}]})
@@ -163,6 +168,7 @@ class MongoDBLoader:
             relation_collection.delete({"subject": obj.id})
 
         # Step 3: Handle obsolete ontology terms
+
         obsolete_terms = [obj.id for obj in ontology_classes if obj.is_obsolete]
         _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection)
 

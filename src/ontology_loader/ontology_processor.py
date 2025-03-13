@@ -64,13 +64,27 @@ class OntologyProcessor:
         """Retrieve all terms that start with the ontology prefix and return a list of OntologyClass objects."""
         ontology_classes = []
 
-        for entity in self.adapter.entities():
+        for entity in self.adapter.entities(filter_obsoletes=True):
             if entity.startswith(self.ontology.upper() + ":"):
                 ontology_class = OntologyClass(
                     id=entity,
                     type="nmdc:OntologyClass",
                     alternative_names=self.adapter.entity_aliases(entity) or [],
                     definition=self.adapter.definition(entity) or "",
+                    relations=[],
+                )
+
+                ontology_classes.append(ontology_class)
+
+        for obolete_entity in self.adapter.obsoletes():
+            if obolete_entity.startswith(self.ontology.upper() + ":"):
+                ontology_class = OntologyClass(
+                    id=obolete_entity,
+                    type="nmdc:OntologyClass",
+                    alternative_names=self.adapter.entity_aliases(obolete_entity) or [],
+                    definition=self.adapter.definition(obolete_entity) or "",
+                    relations=[],
+                    is_obsolete=True
                 )
 
                 ontology_classes.append(ontology_class)

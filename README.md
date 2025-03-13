@@ -72,6 +72,23 @@ def test_load_ontology():
     assert ontology_loader.ontology_relation_set.count() > 0
 ```
 
+### Testing CRUD operations in a live MongoDB
+
+If you want to test the CRUD operations in a live MongoDB instance, you need to set two environment variables:
+MONGO_PASSWORD="your_valid_password"
+ENABLE_DB_TESTS=true
+
+This will allow you to run tests to actually insert/update/delete records in your MongoDB tests instance instead
+of simply mocking the calls. You can then run the tests with the following command:
+
+```bash
+make test
+```
+ 
+The same test command will run without the environment variables, but it will only mock the calls to the database.
+This is intended to help prevent accidental data loss or corruption in a live database environment and to 
+ensure that MONGO_PASSWORD is not hardcoded in the codebase.
+
 ### Reset collections in dev
 
 ```
