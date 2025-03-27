@@ -14,8 +14,26 @@ class MongoDBConfig:
         if cls._instance is None:
             cls._instance = super(MongoDBConfig, cls).__new__(cls)
             cls._instance.db_name = os.getenv("MONGO_DB", "nmdc")
-            cls._instance.db_user = os.getenv("MONGO_USER", "admin")
+            cls._instance.db_user = os.getenv("MONGO_USERNAME", "admin")
             cls._instance.db_password = os.getenv("MONGO_PASSWORD", "")
             cls._instance.db_host = os.getenv("MONGO_HOST", "localhost")
             cls._instance.db_port = int(os.getenv("MONGO_PORT", 27018))
+            cls._instance.replica_set = os.getenv("MONGO_REPLICA_SET", "rs0")
+            # Build optimal connection parameters for replica set with port forwarding
+            cls._instance.connection_params = [
+                "authSource=admin",
+                "replicaSet=" + cls._instance.replica_set,
+                # Connect directly to the server, don't attempt replica set discovery
+                # which would fail due to port forwarding
+                "directConnection=true",
+                # With directConnection=true, we're using a direct connection
+                "connect=true",
+                # Use local threshold for best performance
+                "localThresholdMS=1000",
+                # Set connect timeout shorter to fail faster
+                "connectTimeoutMS=5000",
+                # Don't retry writes in this scenario
+                "retryWrites=false"
+            ]
+            cls._instance.auth_params = "&".join(cls._instance.connection_params)
         return cls._instance

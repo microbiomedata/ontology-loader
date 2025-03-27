@@ -93,6 +93,32 @@ def _upsert_ontology_class(obj, collection, ontology_fields):
 
     return None, None
 
+def get_mongo_connection_string(db_config) -> str:
+    """
+    Generate a formatted MongoDB connection string from a db_config object.
+
+    Args:
+        db_config: An object containing MongoDB connection parameters.
+
+    Returns:
+        str: A properly formatted MongoDB connection string.
+    """
+
+    # Handle MongoDB connection string variations
+    if db_config.db_host.startswith("mongodb://"):
+        parts = db_config.db_host.replace("mongodb://", "").split(":")
+        db_config.db_host = parts[0]
+        if len(parts) > 1 and ":" in db_config.db_host + ":" + parts[1]:
+            port_part = parts[1].split("/")[0]
+            if port_part.isdigit():
+                db_config.db_port = int(port_part)
+
+    connection_string = (
+        f"mongodb://{db_config.db_user}:{db_config.db_password}@"
+        f"{db_config.db_host}:{db_config.db_port}/"
+        f"{db_config.db_name}?{db_config.auth_params}"
+    )
+    return connection_string
 
 class MongoDBLoader:
 
@@ -104,25 +130,11 @@ class MongoDBLoader:
 
         :param schema_view: LinkML SchemaView for ontology
         """
-        db_config = MongoDBConfig()
-        self.schema_view = schema_view
-
         # Get database config from environment variables or fallback to MongoDBConfig defaults
-        self.db_host = os.getenv("MONGO_HOST", db_config.db_host)
-        self.db_port = int(os.getenv("MONGO_PORT", db_config.db_port))
-        self.db_name = os.getenv("MONGO_DB", db_config.db_name)
-        self.db_user = os.getenv("MONGO_USER", db_config.db_user)
-        self.db_password = os.getenv("MONGO_PASSWORD", db_config.db_password)
-
-        # Handle MongoDB connection string variations
-        if self.db_host.startswith("mongodb://"):
-            self.db_host = self.db_host.replace("mongodb://", "")
-            self.db_port = int(self.db_host.split(":")[1])
-            self.db_host = self.db_host.split(":")[0]
-
-        self.handle = (
-            f"mongodb://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}?authSource=admin"
-        )
+        self.db_config = MongoDBConfig()
+        self.schema_view = schema_view
+            
+        self.handle = get_mongo_connection_string(self.db_config)
 
         logger.info(f"MongoDB connection string: {self.handle}")
         self.client = Client(handle=self.handle)

@@ -94,6 +94,9 @@ ensure that MONGO_PASSWORD is not hardcoded in the codebase.
 ```
 % docker exec -it mongodb-container bash
 % mongosh mongodb://admin:root@mongo:27017/nmdc?authSource=admin
+% db.ontology_class_set.find({}).pretty()
+% db.ontology_relation_set.find({}).pretty()
+% db.biosample_set.find({}).pretty()
 % db.ontology_class_set.drop()
 % db.ontology_relation_set.drop()
 ```
