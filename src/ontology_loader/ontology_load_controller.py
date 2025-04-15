@@ -53,8 +53,8 @@ class OntologyLoaderController:
 
         # Connect to MongoDB
         db_manager = MongoDBLoader(schema_view=nmdc_sv)
-        logger.info(f"Db port {db_manager.db_port}")
-        logger.info(f"MongoDB host {db_manager.db_host}")
+        logger.info(f"Db port {db_manager.db_config.db_port}")
+        logger.info(f"MongoDB host {db_manager.db_config.db_host}")
 
         # Update data
         updates_report, insertions_report, insert_relations_report = db_manager.upsert_ontology_data(
