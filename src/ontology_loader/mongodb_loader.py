@@ -161,34 +161,12 @@ class MongoDBLoader:
         class_collection = self.db.create_collection(class_collection_name, recreate_if_exists=False)
         relation_collection = self.db.create_collection(relation_collection_name, recreate_if_exists=False)
         class_collection.index("id", unique=False)
-        relation_collection.index(["subject", "predicate", "object"], unique=False)
+        relation_collection.index(["subject", "object", "predicate"], unique=False)
 
         # Step 1: Upsert ontology terms
         updates_report, insertions_report = [], []
         ontology_fields = [field.name for field in fields(OntologyClass)]
 
-        for obj in ontology_classes:
-            was_updated, report_row = _upsert_ontology_class(obj, class_collection, ontology_fields)
-            if was_updated:
-                updates_report.append(report_row)
-            elif was_updated is False:  # Not None, but False (new insertion)
-                insertions_report.append(report_row)
-
-        # Step 2: Clear ontology term relations for each term
-        for obj in ontology_classes:
-            relation_collection.delete({"subject": obj.id})
-
-        # Step 3: Handle obsolete ontology terms
-
-        obsolete_terms = [obj.id for obj in ontology_classes if obj.is_obsolete]
-        _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection)
-
-        # Step 4: Re-populate relations
-        insertions_report_relations = []
-        for relation in ontology_relations:
-            relation_data = _upsert_relation(relation, relation_collection)
-            if relation_data:
-                insertions_report_relations.append(relation_data)
 
         logging.info(
             f"Finished upserting ontology data: {len(ontology_classes)} classes, {len(ontology_relations)} relations."

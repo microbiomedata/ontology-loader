@@ -36,7 +36,7 @@ specified by NMDC schema.
 % poetry install
 % poetry run ontology_loader --help
 % poetry run ontology_loader --source-ontology "envo"
-% poetry run ontology_loader --source-ontology "go"
+% poetry run ontology_loader --source-ontology "uberon"
 ```
 
 #### Running the tests
@@ -92,7 +92,7 @@ ensure that MONGO_PASSWORD is not hardcoded in the codebase.
 ### Reset collections in dev
 
 ```
-% docker exec -it mongodb-container bash
+% docker exec -it mongo bash
 % mongosh mongodb://admin:root@mongo:27017/nmdc?authSource=admin
 % db.ontology_class_set.find({}).pretty()
 % db.ontology_relation_set.find({}).pretty()
