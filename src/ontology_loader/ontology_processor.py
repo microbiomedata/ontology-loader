@@ -132,10 +132,7 @@ class OntologyProcessor:
 
         # Get all relevant entities in one pass
         logger.info("Collecting relevant entities...")
-        relevant_entities = set(
-            entity for entity in self.adapter.entities()
-            if entity.startswith(ontology_prefix)
-        )
+        relevant_entities = set(entity for entity in self.adapter.entities() if entity.startswith(ontology_prefix))
         logger.info(f"Found {len(relevant_entities)} relevant entities")
 
         # Process all direct relationships in one batch
@@ -159,7 +156,8 @@ class OntologyProcessor:
         for entity in relevant_entities:
             # Get ancestors for this entity and filter to only include those from our ontology
             ancestors = set(
-                ancestor for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=predicates)
+                ancestor
+                for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=predicates)
                 if ancestor.startswith(ontology_prefix)
             )
 
@@ -176,5 +174,3 @@ class OntologyProcessor:
 
         # Return the relations and updated ontology terms
         return ontology_relations, list(ontology_terms_dict.values())
-
-

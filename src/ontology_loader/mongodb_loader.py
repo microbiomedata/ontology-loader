@@ -160,7 +160,6 @@ class MongoDBLoader:
 
         logger.info(f"Connected to MongoDB: {self.db}")
 
-
     def upsert_ontology_data(
         self,
         ontology_classes: List[OntologyClass],
