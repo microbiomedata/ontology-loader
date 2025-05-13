@@ -164,9 +164,26 @@ class MongoDBLoader:
         relation_collection.index(["subject", "object", "predicate"], unique=False)
 
         # Step 1: Upsert ontology terms
-        updates_report, insertions_report = [], []
+        updates_report, insertions_report, insertions_report_relations = [], [], []
         ontology_fields = [field.name for field in fields(OntologyClass)]
 
+        # Step 1.1: Handle obsolete terms
+        obsolete_terms = [obj.id for obj in ontology_classes if getattr(obj, "is_obsolete", False)]
+        _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection)
+
+        # Step 1.2: Upsert ontology classes
+        for obj in ontology_classes:
+            was_updated, report_row = _upsert_ontology_class(obj, class_collection, ontology_fields)
+            if was_updated and report_row:
+                updates_report.append(report_row)
+            elif not was_updated and report_row:
+                insertions_report.append(report_row)
+
+        # Step 2: Upsert relations
+        for relation in ontology_relations:
+            report_data = _upsert_relation(relation, relation_collection)
+            if report_data:
+                insertions_report_relations.append(report_data)
 
         logging.info(
             f"Finished upserting ontology data: {len(ontology_classes)} classes, {len(ontology_relations)} relations."
