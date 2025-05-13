@@ -172,8 +172,8 @@ class MongoDBLoader:
 
         :param ontology_classes: A list of OntologyClass objects to upsert.
         :param ontology_relations: A list of OntologyRelation objects to upsert.
-        :param class_collection_name: MongoDB collection name for ontology classes. Defaults to self.class_collection_name.
-        :param relation_collection_name: MongoDB collection name for ontology relations. Defaults to self.relation_collection_name.
+        :param class_collection_name: MongoDB collection name for ontology classes.
+        :param relation_collection_name: MongoDB collection name for ontology relations.
         :return: A tuple of three reports: class updates, class insertions, and relation insertions.
         """
         # Use default collection names if not specified
