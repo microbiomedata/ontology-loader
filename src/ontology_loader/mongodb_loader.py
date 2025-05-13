@@ -1,7 +1,6 @@
 """Load and process ontology terms and relations into MongoDB."""
 
 import logging
-import os
 from dataclasses import asdict, fields
 from typing import List, Optional
 
@@ -93,6 +92,7 @@ def _upsert_ontology_class(obj, collection, ontology_fields):
 
     return None, None
 
+
 def get_mongo_connection_string(db_config) -> str:
     """
     Generate a formatted MongoDB connection string from a db_config object.
@@ -102,8 +102,8 @@ def get_mongo_connection_string(db_config) -> str:
 
     Returns:
         str: A properly formatted MongoDB connection string.
-    """
 
+    """
     # Handle MongoDB connection string variations
     if db_config.db_host.startswith("mongodb://"):
         parts = db_config.db_host.replace("mongodb://", "").split(":")
@@ -120,6 +120,7 @@ def get_mongo_connection_string(db_config) -> str:
     )
     return connection_string
 
+
 class MongoDBLoader:
 
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
@@ -133,7 +134,7 @@ class MongoDBLoader:
         # Get database config from environment variables or fallback to MongoDBConfig defaults
         self.db_config = MongoDBConfig()
         self.schema_view = schema_view
-            
+
         self.handle = get_mongo_connection_string(self.db_config)
 
         logger.info(f"MongoDB connection string: {self.handle}")
