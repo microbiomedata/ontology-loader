@@ -91,44 +91,90 @@ class OntologyProcessor:
 
         return ontology_classes
 
+    def _create_relation(self, subject, predicate, obj, ontology_terms_dict):
+        """
+        Create an ontology relation and update related ontology terms.
+
+        :param subject: Subject of the relation
+        :param predicate: Predicate of the relation
+        :param obj: Object of the relation
+        :param ontology_terms_dict: Dictionary of ontology terms for fast lookup
+        :return: Dictionary representation of the relation
+        """
+        ontology_relation = OntologyRelation(
+            subject=subject,
+            predicate=predicate,
+            object=obj,
+            type="nmdc:OntologyRelation",
+        )
+
+        # Update the term's relations list if it exists in our dictionary
+        if subject in ontology_terms_dict:
+            ontology_terms_dict[subject].relations.append(ontology_relation)
+
+        # Convert and return the relation dictionary
+        return json_dumper.to_dict(ontology_relation)
+
     def get_relations_closure(self, predicates=None, ontology_terms: list = None) -> tuple:
         """
-        Retrieve all ontology relations closure for terms.
+        Retrieve all ontology relations closure for terms with improved performance.
 
         :param predicates: List of predicates to consider (default: ["rdfs:subClassOf", "BFO:0000050"])
         :param ontology_terms: List of OntologyClass objects to consider (default: None)
-
+        :return: Tuple of (ontology_relations, updated_ontology_terms)
         """
         predicates = ["rdfs:subClassOf", "BFO:0000050"] if predicates is None else predicates
+        ontology_prefix = self.ontology.upper() + ":"
         ontology_relations = []
 
-        # turn the ontology_terms list of OntologyClass objects into a dictionary for fast lookup
-        if ontology_terms is None:
-            ontology_terms = []
-        ontology_terms_dict = {term.id: term for term in ontology_terms}
+        # Create dictionary for fast lookup of ontology terms
+        ontology_terms_dict = {term.id: term for term in (ontology_terms or [])}
 
-        for entity in self.adapter.entities():
-            # entity is an ontology (aka: ENVO) term curie
-            if entity.startswith(self.ontology.upper() + ":"):
-                # Convert generator to list
-                ancestors_list = list(self.adapter.ancestors(entity, reflexive=True, predicates=predicates))
-                # Filter to keep only ENVO terms
-                filtered_ancestors = list(set(a for a in ancestors_list if a.startswith(self.ontology.upper() + ":")))
+        # Get all relevant entities in one pass
+        logger.info("Collecting relevant entities...")
+        relevant_entities = set(
+            entity for entity in self.adapter.entities()
+            if entity.startswith(ontology_prefix)
+        )
+        logger.info(f"Found {len(relevant_entities)} relevant entities")
 
-                for ancestor in filtered_ancestors:
-                    ontology_relation = OntologyRelation(
-                        subject=entity,
-                        predicate="entailed_isa_partof_closure",
-                        object=ancestor,
-                        type="nmdc:OntologyRelation",
-                    )
+        # Process all direct relationships in one batch
+        logger.info("Processing direct relationships...")
+        relationship_count = 0
+        predicate_set = set(predicates)  # Convert to set for faster lookups
 
-                    # Use the dictionary for fast lookup
-                    if entity in ontology_terms_dict:
-                        ontology_terms_dict[entity].relations.append(ontology_relation)
+        # Get all relationships at once and filter as we process them
+        for subject, predicate, obj in self.adapter.relationships():
+            if subject in relevant_entities and predicate in predicate_set:
+                relation_dict = self._create_relation(subject, predicate, obj, ontology_terms_dict)
+                ontology_relations.append(relation_dict)
+                relationship_count += 1
 
-                    # Convert OntologyRelation instance to a dictionary
-                    ontology_relations.append(json_dumper.to_dict(ontology_relation))
+        logger.info(f"Processed {relationship_count} direct relationships")
 
-        # send back the ontology_relations list and convert the quick dict lookup structure back to a list
+        # Process all ancestors for all entities in one batch
+        logger.info("Processing ancestry relationships...")
+        ancestry_count = 0
+
+        for entity in relevant_entities:
+            # Get ancestors for this entity and filter to only include those from our ontology
+            ancestors = set(
+                ancestor for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=predicates)
+                if ancestor.startswith(ontology_prefix)
+            )
+
+            # Create relations for each ancestor
+            for ancestor in ancestors:
+                relation_dict = self._create_relation(
+                    entity, "entailed_isa_partof_closure", ancestor, ontology_terms_dict
+                )
+                ontology_relations.append(relation_dict)
+                ancestry_count += 1
+
+        logger.info(f"Processed {ancestry_count} ancestry relationships")
+        logger.info(f"Total relations: {len(ontology_relations)}")
+
+        # Return the relations and updated ontology terms
         return ontology_relations, list(ontology_terms_dict.values())
+
+
