@@ -143,13 +143,6 @@ class MongoDBLoader:
         self.client = Client(handle=self.handle)
         self.db = self.client.attach_database(handle=self.handle)
 
-        # Default collection names
-        self.class_collection_name = "ontology_class_set"
-        self.relation_collection_name = "ontology_relation_set"
-
-        class_collection = self.db.create_collection(self.class_collection_name, recreate_if_exists=False)
-        relation_collection = self.db.create_collection(self.relation_collection_name, recreate_if_exists=False)
-
         # Create indexes after bulk data loading is complete
         # try:
         #     # Create a custom-named index on 'id'
@@ -182,8 +175,6 @@ class MongoDBLoader:
         :return: A tuple of three reports: class updates, class insertions, and relation insertions.
         """
         # Use default collection names if not specified
-        class_collection_name = class_collection_name or self.class_collection_name
-        relation_collection_name = relation_collection_name or self.relation_collection_name
 
         # Get the collections (they should already exist and have indexes from initialization)
         class_collection = self.db.create_collection(class_collection_name, recreate_if_exists=False)
