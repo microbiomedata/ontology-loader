@@ -33,7 +33,7 @@ class MongoDBConfig:
                 # Set connect timeout shorter to fail faster
                 "connectTimeoutMS=5000",
                 # Don't retry writes in this scenario
-                "retryWrites=false"
+                "retryWrites=false",
             ]
             cls._instance.auth_params = "&".join(cls._instance.connection_params)
         return cls._instance

@@ -1,7 +1,6 @@
 """Load and process ontology terms and relations into MongoDB."""
 
 import logging
-import os
 from dataclasses import asdict, fields
 from typing import List, Optional
 
@@ -59,7 +58,9 @@ def _upsert_relation(relation, collection):
         logging.warning(f"Skipping invalid relation: {relation}")
         return None
 
-    collection.upsert([relation], filter_fields=["subject", "predicate", "object"])
+    # Get all relation fields to use as update_fields
+    update_fields = list(relation.keys())
+    collection.upsert([relation], filter_fields=["subject", "predicate", "object"], update_fields=update_fields)
     logging.debug(f"Inserted OntologyRelation: {relation}")
     return [relation.get("subject"), relation.get("predicate"), relation.get("object")]
 
@@ -93,6 +94,7 @@ def _upsert_ontology_class(obj, collection, ontology_fields):
 
     return None, None
 
+
 def get_mongo_connection_string(db_config) -> str:
     """
     Generate a formatted MongoDB connection string from a db_config object.
@@ -102,8 +104,8 @@ def get_mongo_connection_string(db_config) -> str:
 
     Returns:
         str: A properly formatted MongoDB connection string.
-    """
 
+    """
     # Handle MongoDB connection string variations
     if db_config.db_host.startswith("mongodb://"):
         parts = db_config.db_host.replace("mongodb://", "").split(":")
@@ -120,6 +122,7 @@ def get_mongo_connection_string(db_config) -> str:
     )
     return connection_string
 
+
 class MongoDBLoader:
 
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
@@ -133,12 +136,27 @@ class MongoDBLoader:
         # Get database config from environment variables or fallback to MongoDBConfig defaults
         self.db_config = MongoDBConfig()
         self.schema_view = schema_view
-            
+
         self.handle = get_mongo_connection_string(self.db_config)
 
         logger.info(f"MongoDB connection string: {self.handle}")
         self.client = Client(handle=self.handle)
         self.db = self.client.attach_database(handle=self.handle)
+
+        # Default collection names
+        self.class_collection_name = "ontology_class_set"
+        self.relation_collection_name = "ontology_relation_set"
+
+        class_collection = self.db.create_collection(self.class_collection_name, recreate_if_exists=False)
+        relation_collection = self.db.create_collection(self.relation_collection_name, recreate_if_exists=False)
+
+        # Create indexes after bulk data loading is complete
+        try:
+            class_collection.index("id", unique=False)
+            relation_collection.index(["subject", "object", "predicate"], unique=False)
+            logger.info("Successfully created indexes after bulk data loading")
+        except Exception as e:
+            logger.warning(f"Error creating indexes: {str(e)}")
 
         logger.info(f"Connected to MongoDB: {self.db}")
 
@@ -146,8 +164,8 @@ class MongoDBLoader:
         self,
         ontology_classes: List[OntologyClass],
         ontology_relations: List[OntologyRelation],
-        class_collection_name: str = "ontology_class_set",
-        relation_collection_name: str = "ontology_relation_set",
+        class_collection_name: str = None,
+        relation_collection_name: str = None,
     ):
         """
         Upsert ontology terms, clear/re-populate ontology relations, handle obsolescence, and manage hierarchy changes.
@@ -158,37 +176,35 @@ class MongoDBLoader:
         :param relation_collection_name: MongoDB collection name for ontology relations.
         :return: A tuple of three reports: class updates, class insertions, and relation insertions.
         """
+        # Use default collection names if not specified
+        class_collection_name = class_collection_name or self.class_collection_name
+        relation_collection_name = relation_collection_name or self.relation_collection_name
+
+        # Get the collections (they should already exist and have indexes from initialization)
         class_collection = self.db.create_collection(class_collection_name, recreate_if_exists=False)
         relation_collection = self.db.create_collection(relation_collection_name, recreate_if_exists=False)
-        class_collection.index("id", unique=False)
-        relation_collection.index(["subject", "predicate", "object"], unique=False)
 
         # Step 1: Upsert ontology terms
-        updates_report, insertions_report = [], []
+        updates_report, insertions_report, insertions_report_relations = [], [], []
         ontology_fields = [field.name for field in fields(OntologyClass)]
 
-        for obj in ontology_classes:
-            was_updated, report_row = _upsert_ontology_class(obj, class_collection, ontology_fields)
-            if was_updated:
-                updates_report.append(report_row)
-            elif was_updated is False:  # Not None, but False (new insertion)
-                insertions_report.append(report_row)
-
-        # Step 2: Clear ontology term relations for each term
-        for obj in ontology_classes:
-            relation_collection.delete({"subject": obj.id})
-
-        # Step 3: Handle obsolete ontology terms
-
-        obsolete_terms = [obj.id for obj in ontology_classes if obj.is_obsolete]
+        # Step 1.1: Handle obsolete terms
+        obsolete_terms = [obj.id for obj in ontology_classes if getattr(obj, "is_obsolete", False)]
         _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection)
 
-        # Step 4: Re-populate relations
-        insertions_report_relations = []
+        # Step 1.2: Upsert ontology classes
+        for obj in ontology_classes:
+            was_updated, report_row = _upsert_ontology_class(obj, class_collection, ontology_fields)
+            if was_updated and report_row:
+                updates_report.append(report_row)
+            elif not was_updated and report_row:
+                insertions_report.append(report_row)
+
+        # Step 2: Upsert relations
         for relation in ontology_relations:
-            relation_data = _upsert_relation(relation, relation_collection)
-            if relation_data:
-                insertions_report_relations.append(relation_data)
+            report_data = _upsert_relation(relation, relation_collection)
+            if report_data:
+                insertions_report_relations.append(report_data)
 
         logging.info(
             f"Finished upserting ontology data: {len(ontology_classes)} classes, {len(ontology_relations)} relations."
