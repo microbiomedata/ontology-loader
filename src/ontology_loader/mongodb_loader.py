@@ -151,12 +151,17 @@ class MongoDBLoader:
         relation_collection = self.db.create_collection(self.relation_collection_name, recreate_if_exists=False)
 
         # Create indexes after bulk data loading is complete
-        # try:
-        #     class_collection.index("id", unique=False)
-        #     relation_collection.index(["subject", "object", "predicate"], unique=False)
-        #     logger.info("Successfully created indexes after bulk data loading")
-        # except Exception as e:
-        #     logger.warning(f"Error creating indexes: {str(e)}")
+        try:
+            # Create a custom-named index on 'id'
+            class_collection.create_index([("id", 1)], unique=False, name="ontology_class_id_index")
+
+            # Create a custom-named index on 'subject', 'object', and 'predicate'
+            relation_collection.create_index([("subject", 1), ("object", 1), ("predicate", 1)], unique=False,
+                                             name="ontology_relation_unique_index")
+
+            logger.info("Successfully created indexes after bulk data loading")
+        except Exception as e:
+            logger.warning(f"Error creating indexes: {str(e)}")
 
         logger.info(f"Connected to MongoDB: {self.db}")
 
