@@ -143,19 +143,6 @@ class MongoDBLoader:
         self.client = Client(handle=self.handle)
         self.db = self.client.attach_database(handle=self.handle)
 
-        # Create indexes after bulk data loading is complete
-        # try:
-        #     # Create a custom-named index on 'id'
-        #     class_collection.create_index([("id", 1)], unique=False, name="ontology_class_id_index")
-        #
-        #     # Create a custom-named index on 'subject', 'object', and 'predicate'
-        #     relation_collection.create_index([("subject", 1), ("object", 1), ("predicate", 1)], unique=False,
-        #                                      name="ontology_relation_unique_index")
-        #
-        #     logger.info("Successfully created indexes after bulk data loading")
-        # except Exception as e:
-        #     logger.warning(f"Error creating indexes: {str(e)}")
-
         logger.info(f"Connected to MongoDB: {self.db}")
 
     def upsert_ontology_data(
@@ -179,6 +166,9 @@ class MongoDBLoader:
         # Get the collections (they should already exist and have indexes from initialization)
         class_collection = self.db.create_collection(class_collection_name, recreate_if_exists=False)
         relation_collection = self.db.create_collection(relation_collection_name, recreate_if_exists=False)
+
+        class_collection.index("id", unique=False, name="ontology_class_index")
+        relation_collection.index(["subject", "predicate", "object"], unique=False, name="ontology_relation_index")
 
         # Step 1: Upsert ontology terms
         updates_report, insertions_report, insertions_report_relations = [], [], []
