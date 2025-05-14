@@ -1369,14 +1369,14 @@ requests = "*"
 
 [[package]]
 name = "linkml-store"
-version = "0.2.10rc1"
+version = "0.2.10"
 description = "linkml-store"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "linkml_store-0.2.10rc1-py3-none-any.whl", hash = "sha256:578f5cb84bd77baccb940d0b6324c364fbacc0ae7490dd9d5dff3cf6a5f87e12"},
-    {file = "linkml_store-0.2.10rc1.tar.gz", hash = "sha256:0d48e85b8698c03f4e23658393ba9887be8c4cf810f086e9a47bd5f07ae35b23"},
+    {file = "linkml_store-0.2.10-py3-none-any.whl", hash = "sha256:1548a36e686ebc784a8365e3ea659d21686b7cf7109615353e7ef4b23b5fb078"},
+    {file = "linkml_store-0.2.10.tar.gz", hash = "sha256:543f4ea76d5afb6a18471a4ba2d3761258309486ae87c8fdcaf70a2737515830"},
 ]
 
 [package.dependencies]
@@ -4337,4 +4337,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "244ab6f08a25454c2273e118c2a42d2d4ed0007abbf5a3d48a7f28fefb40867b"
+content-hash = "fc1eb224e6579ae17d9eb6ed18f43bf9c251d7b70da84f50852c492ee2f8e22b"
