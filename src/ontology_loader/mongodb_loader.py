@@ -162,8 +162,8 @@ class MongoDBLoader:
         self,
         ontology_classes: List[OntologyClass],
         ontology_relations: List[OntologyRelation],
-        class_collection_name: str = None,
-        relation_collection_name: str = None,
+        class_collection_name: str = "ontology_class_set",
+        relation_collection_name: str = "ontology_relation_set",
     ):
         """
         Upsert ontology terms, clear/re-populate ontology relations, handle obsolescence, and manage hierarchy changes.

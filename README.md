@@ -99,4 +99,6 @@ ensure that MONGO_PASSWORD is not hardcoded in the codebase.
 % db.biosample_set.find({}).pretty()
 % db.ontology_class_set.drop()
 % db.ontology_relation_set.drop()
+% db.ontology_class_set.countDocuments()
+% db.ontology_relation_set.countDocuments()
 ```
