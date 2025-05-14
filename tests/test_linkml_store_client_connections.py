@@ -20,7 +20,7 @@ def test_mongo_client():
     """Test MongoDB client connection from pymongo."""
     # Initialize the MongoDB client
     client = MongoClient(
-        host=f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource={AUTH_DB}"
+        host=f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource={AUTH_DB}&directConnection=true"
     )
 
     # Select the target database for insert/update operations
@@ -43,10 +43,10 @@ def test_mongo_client():
 def test_linkmlstore_client():
     """Test the MongoDB client connection from linkml-store."""
     client = Client(
-        handle=f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource={AUTH_DB}"
+        handle=f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource={AUTH_DB}&directConnection=true"
     )
     db = client.attach_database(
-        handle=f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource={AUTH_DB}",
+        handle=f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource={AUTH_DB}&directConnection=true",
         alias=MONGO_DB,
     )
     print("Connected to MongoDB:", db.metadata)
