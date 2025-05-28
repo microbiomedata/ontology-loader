@@ -1,7 +1,7 @@
 """Singleton class to store default parameters accessed from client environment or sensible defaults."""
 
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 

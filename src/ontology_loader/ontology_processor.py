@@ -182,9 +182,7 @@ class OntologyProcessor:
 
             # Create relations for each ancestor
             for ancestor in ancestors:
-                relation_dict = _create_relation(
-                    entity, "entailed_isa_partof_closure", ancestor, ontology_terms_dict
-                )
+                relation_dict = _create_relation(entity, "entailed_isa_partof_closure", ancestor, ontology_terms_dict)
                 ontology_relations.append(relation_dict)
                 ancestry_count += 1
 

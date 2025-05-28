@@ -26,8 +26,6 @@ def test_mongo_client():
     # Select the target database for insert/update operations
     db = client[MONGO_DB]
 
-    ("Connected to MongoDB:", db)
-
     # Example Insert
     collection = db["ontology_class_set"]
 

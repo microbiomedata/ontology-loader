@@ -46,6 +46,10 @@ The Docker container networking uses container names (like 'mongo') for internal
 % use nmdc
 % db.ontology_class_set.find().pretty()
 % db.ontology_relation_set.find().pretty()
+% db.ontology_class_set.find( { id: { $regex: /^PO/ } } ).pretty()
+% db.ontology_class_set.find( { id: { $regex: /^UBERON/ } } ).pretty()
+% db.ontology_class_set.find( { id: { $regex: /^ENVO/ } } ).pretty()
+% db.ontology_class_set.find( { alternative_identifiers: { $exists: true, $ne: [] } } ).pretty()
 ``` 
 
 #### Command line

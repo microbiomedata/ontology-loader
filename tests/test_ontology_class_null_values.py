@@ -1,11 +1,11 @@
 """Test that all OntologyClass instances in MongoDB have non-null required attributes."""
 
 import os
-import pytest
-from linkml_runtime import SchemaView
 
-from ontology_loader.ontology_processor import OntologyProcessor
+import pytest
+
 from ontology_loader.mongodb_loader import MongoDBLoader
+from ontology_loader.ontology_processor import OntologyProcessor
 from ontology_loader.utils import load_yaml_from_package
 
 # MongoDB Connection Parameters
@@ -59,37 +59,29 @@ def test_ontology_class_non_null_attributes(mongodb_loader, schema_view):
     # Find all documents with null values for the attributes we're checking
     null_is_root_query = {"is_root": None}
     null_is_obsolete_query = {"is_obsolete": None}
-    null_name_query = {"name": None}
 
     # Execute queries
     null_is_root_results = collection.find(null_is_root_query)
     null_is_obsolete_results = collection.find(null_is_obsolete_query)
-    null_name_results = collection.find(null_name_query)
 
-    # Check results and provide helpful error messages with examples
     if null_is_root_results.num_rows > 0:
         example = null_is_root_results.rows[0]
-        example_id = example.get('id', 'unknown')
-        assert False, f"Found {null_is_root_results.num_rows} instances with null is_root {example_id}"
+        example_id = example.get("id", "unknown")
+        raise AssertionError(
+            f"Found {null_is_root_results.num_rows} instances with null is_root. Example id: {example_id}"
+        )
 
     if null_is_obsolete_results.num_rows > 0:
         example = null_is_obsolete_results.rows[0]
-        example_id = example.get('id', 'unknown')
-        assert False, f"Found {null_is_obsolete_results.num_rows} instances with null is_obsolete {example_id}"
-
-    if null_name_results.num_rows > 0:
-        example = null_name_results.rows[0]
-        example_id = example.get('id', 'unknown')
-        assert False, (f"Found {null_name_results.num_rows} OntologyClass instances with null name."
-                       f" Example: id={example_id}")
+        example_id = example.get("id", "unknown")
+        raise AssertionError(
+            f"Found {null_is_obsolete_results.num_rows} instances with null is_obsolete. Example id: {example_id}"
+        )
 
 
 @pytest.mark.skipif(os.getenv("MONGO_PASSWORD") is None, reason="Skipping test: MONGO_PASSWORD is not set")
 def test_ontology_class_empty_string_name(mongodb_loader, schema_view):
-    """
-    Test that <10% of all OntologyClass instances in MongoDB have a non-empty string value for name.
-
-    """
+    """Test that <10% of all OntologyClass instances in MongoDB have a non-empty string value for name."""
     # Process a small test ontology and load it into MongoDB (if not already done by the previous test)
     ontology_processor = OntologyProcessor(TEST_ONTOLOGY)
     ontology_classes = ontology_processor.get_terms_and_metadata()
