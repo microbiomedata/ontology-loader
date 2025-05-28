@@ -13,6 +13,31 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+def _create_relation(subject, predicate, obj, ontology_terms_dict):
+    """
+    Create an ontology relation and update related ontology terms.
+
+    :param subject: Subject of the relation
+    :param predicate: Predicate of the relation
+    :param obj: Object of the relation
+    :param ontology_terms_dict: Dictionary of ontology terms for fast lookup
+    :return: Dictionary representation of the relation
+    """
+    ontology_relation = OntologyRelation(
+        subject=subject,
+        predicate=predicate,
+        object=obj,
+        type="nmdc:OntologyRelation",
+    )
+
+    # Update the term's relations list if it exists in our dictionary
+    if subject in ontology_terms_dict:
+        ontology_terms_dict[subject].relations.append(ontology_relation)
+
+    # Convert and return the relation dictionary
+    return json_dumper.to_dict(ontology_relation)
+
+
 class OntologyProcessor:
 
     """Ontology Processor class to process ontology terms and relations."""
@@ -28,6 +53,9 @@ class OntologyProcessor:
         self.ontology_db_path = self.download_and_prepare_ontology()
         self.adapter = get_adapter(f"sqlite:{self.ontology_db_path}")
         self.adapter.precompute_lookups()  # Optimize lookups
+
+        # Cache root terms for efficient lookups
+        self.root_terms = set(self.adapter.roots())
 
     def download_and_prepare_ontology(self):
         """Download and prepare the ontology database for processing."""
@@ -60,60 +88,51 @@ class OntologyProcessor:
         logger.info(f"Ontology database is ready at: {decompressed_path}")
         return decompressed_path
 
+    def _create_ontology_class(self, entity_id, is_obsolete=False):
+        """
+        Create an OntologyClass instance with common attributes.
+
+        :param entity_id: The entity ID for the ontology class
+        :param is_obsolete: Whether the entity is obsolete
+        :return: An OntologyClass instance
+        """
+        ontology_class = OntologyClass(
+            id=entity_id,
+            type="nmdc:OntologyClass",
+            alternative_names=self.adapter.entity_aliases(entity_id) or [],
+            definition=self.adapter.definition(entity_id) or "",
+            relations=[],
+            is_root=entity_id in self.root_terms,
+            is_obsolete=is_obsolete,
+            name=self.adapter.label(entity_id) or "",
+        )
+
+        # Ensure boolean values are properly set
+        if ontology_class.is_root is None:
+            ontology_class.is_root = False
+        if ontology_class.is_obsolete is None:
+            ontology_class.is_obsolete = is_obsolete
+
+        return ontology_class
+
     def get_terms_and_metadata(self):
         """Retrieve all terms that start with the ontology prefix and return a list of OntologyClass objects."""
         ontology_classes = []
+        ontology_prefix = self.ontology.upper() + ":"
 
+        # Process non-obsolete entities
         for entity in self.adapter.entities(filter_obsoletes=True):
-            if entity.startswith(self.ontology.upper() + ":"):
-                ontology_class = OntologyClass(
-                    id=entity,
-                    type="nmdc:OntologyClass",
-                    alternative_names=self.adapter.entity_aliases(entity) or [],
-                    definition=self.adapter.definition(entity) or "",
-                    relations=[],
-                )
-
+            if entity.startswith(ontology_prefix):
+                ontology_class = self._create_ontology_class(entity, is_obsolete=False)
                 ontology_classes.append(ontology_class)
 
-        for obolete_entity in self.adapter.obsoletes():
-            if obolete_entity.startswith(self.ontology.upper() + ":"):
-                ontology_class = OntologyClass(
-                    id=obolete_entity,
-                    type="nmdc:OntologyClass",
-                    alternative_names=self.adapter.entity_aliases(obolete_entity) or [],
-                    definition=self.adapter.definition(obolete_entity) or "",
-                    relations=[],
-                    is_obsolete=True,
-                )
-
+        # Process obsolete entities
+        for obsolete_entity in self.adapter.obsoletes():
+            if obsolete_entity.startswith(ontology_prefix):
+                ontology_class = self._create_ontology_class(obsolete_entity, is_obsolete=True)
                 ontology_classes.append(ontology_class)
 
         return ontology_classes
-
-    def _create_relation(self, subject, predicate, obj, ontology_terms_dict):
-        """
-        Create an ontology relation and update related ontology terms.
-
-        :param subject: Subject of the relation
-        :param predicate: Predicate of the relation
-        :param obj: Object of the relation
-        :param ontology_terms_dict: Dictionary of ontology terms for fast lookup
-        :return: Dictionary representation of the relation
-        """
-        ontology_relation = OntologyRelation(
-            subject=subject,
-            predicate=predicate,
-            object=obj,
-            type="nmdc:OntologyRelation",
-        )
-
-        # Update the term's relations list if it exists in our dictionary
-        if subject in ontology_terms_dict:
-            ontology_terms_dict[subject].relations.append(ontology_relation)
-
-        # Convert and return the relation dictionary
-        return json_dumper.to_dict(ontology_relation)
 
     def get_relations_closure(self, predicates=None, ontology_terms: list = None) -> tuple:
         """
@@ -143,7 +162,7 @@ class OntologyProcessor:
         # Get all relationships at once and filter as we process them
         for subject, predicate, obj in self.adapter.relationships():
             if subject in relevant_entities and predicate in predicate_set:
-                relation_dict = self._create_relation(subject, predicate, obj, ontology_terms_dict)
+                relation_dict = _create_relation(subject, predicate, obj, ontology_terms_dict)
                 ontology_relations.append(relation_dict)
                 relationship_count += 1
 
@@ -163,7 +182,7 @@ class OntologyProcessor:
 
             # Create relations for each ancestor
             for ancestor in ancestors:
-                relation_dict = self._create_relation(
+                relation_dict = _create_relation(
                     entity, "entailed_isa_partof_closure", ancestor, ontology_terms_dict
                 )
                 ontology_relations.append(relation_dict)

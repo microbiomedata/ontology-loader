@@ -26,17 +26,18 @@ def test_mongo_client():
     # Select the target database for insert/update operations
     db = client[MONGO_DB]
 
-    print("Connected to MongoDB:", db)
-    # Verify connection (List collections)
-    print("Collections in database:", db.list_collection_names())
+    ("Connected to MongoDB:", db)
 
     # Example Insert
     collection = db["ontology_class_set"]
-    collection.insert_one({"id": "test_id", "name": "Test Ontology Class"})
+
+    collection.insert_one({"id": "test_id", "name": "Test Ontology Class", "is_root": False, "is_obsolete": False})
 
     # Fetch inserted data
     result = collection.find_one({"id": "test_id"})
-    print("Inserted Record:", result)
+    assert result is not None, "Failed to insert data into MongoDB"
+    collection.delete_many({"id": "test_id"})
+    assert collection.find_one({"id": "test_id"}) is None, "Failed to delete test data from MongoDB"
 
 
 @pytest.mark.skipif(os.getenv("MONGO_PASSWORD") is None, reason="Skipping test: MONGO_PASSWORD is not set")
@@ -49,6 +50,4 @@ def test_linkmlstore_client():
         handle=f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource={AUTH_DB}&directConnection=true",
         alias=MONGO_DB,
     )
-    print("Connected to MongoDB:", db.metadata)
-    # Verify connection (List collections)
-    print("Collections in database:", db.list_collection_names())
+    assert db is not None, "Failed to connect to MongoDB using linkml-store client"

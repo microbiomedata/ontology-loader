@@ -88,7 +88,14 @@ def _upsert_ontology_class(obj, collection, ontology_fields):
             logging.debug(f"Updated OntologyClass (id={obj.id}): {updated_fields}")
             return True, report_row
     else:
-        collection.upsert([asdict(obj)], filter_fields=["id"], update_fields=ontology_fields)
+        # Ensure boolean fields are explicitly set to avoid null values in MongoDB
+        doc = asdict(obj)
+        if doc.get("is_root") is None:
+            doc["is_root"] = False
+        if doc.get("is_obsolete") is None:
+            doc["is_obsolete"] = False
+
+        collection.upsert([doc], filter_fields=["id"], update_fields=ontology_fields)
         logging.debug(f"Inserted OntologyClass (id={obj.id}).")
         return False, report_row
 
@@ -106,20 +113,13 @@ def get_mongo_connection_string(db_config) -> str:
         str: A properly formatted MongoDB connection string.
 
     """
-    # Handle MongoDB connection string variations
-    if db_config.db_host.startswith("mongodb://"):
-        parts = db_config.db_host.replace("mongodb://", "").split(":")
-        db_config.db_host = parts[0]
-        if len(parts) > 1 and ":" in db_config.db_host + ":" + parts[1]:
-            port_part = parts[1].split("/")[0]
-            if port_part.isdigit():
-                db_config.db_port = int(port_part)
-
+    # Build the MongoDB connection string using the configured parameters
     connection_string = (
         f"mongodb://{db_config.db_user}:{db_config.db_password}@"
         f"{db_config.db_host}:{db_config.db_port}/"
         f"{db_config.db_name}?{db_config.auth_params}"
     )
+    logger.debug(f"Generated MongoDB connection string with host={db_config.db_host}, port={db_config.db_port}")
     return connection_string
 
 

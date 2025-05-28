@@ -15,10 +15,27 @@ specified by NMDC schema.
 - ENV variable for MONGO_PASSWORD (or pass it in via the cli/runner itself directly)
 
 ```bash
-
 % docker pull mongo
 % docker run -d --name mongodb-container -p 27018:27017 mongo
 ```
+
+#### MongoDB Connection Settings
+
+When connecting to MongoDB, you need to set the correct environment variables depending on where your code is running:
+
+1. When running from your local machine (CLI or tests):
+   ```bash
+   export MONGO_HOST=localhost
+   export MONGO_PORT=27018
+   ```
+
+2. When running inside Docker containers:
+   ```bash
+   export MONGO_HOST=mongo
+   export MONGO_PORT=27017
+   ```
+
+The Docker container networking uses container names (like 'mongo') for internal communication, while your host machine must use 'localhost' with the mapped port (27018).
 
 #### Basic mongosh commands
 ```bash
@@ -91,14 +108,16 @@ ensure that MONGO_PASSWORD is not hardcoded in the codebase.
 
 ### Reset collections in dev
 
+```bash
+docker exec -it nmdc-runtime-test-mongo-1 bash
 ```
-% docker exec -it mongo bash
-% mongosh mongodb://admin:root@mongo:27017/nmdc?authSource=admin
-% db.ontology_class_set.find({}).pretty()
-% db.ontology_relation_set.find({}).pretty()
-% db.biosample_set.find({}).pretty()
-% db.ontology_class_set.drop()
-% db.ontology_relation_set.drop()
-% db.ontology_class_set.countDocuments()
-% db.ontology_relation_set.countDocuments()
+```bash
+mongosh mongodb://admin:root@mongo:27017/nmdc?authSource=admin
+db.ontology_class_set.find({}).pretty()
+db.ontology_relation_set.find({}).pretty()
+db.biosample_set.find({}).pretty()
+db.ontology_class_set.drop()
+db.ontology_relation_set.drop()
+db.ontology_class_set.countDocuments()
+db.ontology_relation_set.countDocuments()
 ```
