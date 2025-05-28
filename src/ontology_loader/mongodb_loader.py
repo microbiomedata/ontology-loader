@@ -113,13 +113,20 @@ def get_mongo_connection_string(db_config) -> str:
         str: A properly formatted MongoDB connection string.
 
     """
-    # Build the MongoDB connection string using the configured parameters
+    # Handle MongoDB connection string variations
+    if db_config.db_host.startswith("mongodb://"):
+        parts = db_config.db_host.replace("mongodb://", "").split(":")
+        db_config.db_host = parts[0]
+        if len(parts) > 1 and ":" in db_config.db_host + ":" + parts[1]:
+            port_part = parts[1].split("/")[0]
+            if port_part.isdigit():
+                db_config.db_port = int(port_part)
+
     connection_string = (
         f"mongodb://{db_config.db_user}:{db_config.db_password}@"
         f"{db_config.db_host}:{db_config.db_port}/"
         f"{db_config.db_name}?{db_config.auth_params}"
     )
-    logger.debug(f"Generated MongoDB connection string with host={db_config.db_host}, port={db_config.db_port}")
     return connection_string
 
 

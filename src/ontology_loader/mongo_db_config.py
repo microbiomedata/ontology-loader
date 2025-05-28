@@ -19,20 +19,9 @@ class MongoDBConfig:
             cls._instance.db_name = os.getenv("MONGO_DB", "nmdc")
             cls._instance.db_user = os.getenv("MONGO_USERNAME", "admin")
             cls._instance.db_password = os.getenv("MONGO_PASSWORD", "")
-
-            # Handle MongoDB host with special parsing
-            mongo_host = os.getenv("MONGO_HOST", "localhost")
-            if mongo_host.startswith("mongodb://"):
-                # Extract the host part from mongodb:// URL
-                host_part = mongo_host.replace("mongodb://", "").split(":")[0]
-                logger.debug(f"Extracted host from MongoDB URL: {host_part}")
-                cls._instance.db_host = host_part
-            else:
-                cls._instance.db_host = mongo_host
-
+            cls._instance.db_host = os.getenv("MONGO_HOST", "localhost")
             cls._instance.db_port = int(os.getenv("MONGO_PORT", 27018))
             cls._instance.replica_set = os.getenv("MONGO_REPLICA_SET", "")
-
             # Build connection parameters based on whether replica set is defined
             if cls._instance.replica_set:
                 # Replica set parameters

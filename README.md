@@ -27,6 +27,8 @@ When connecting to MongoDB, you need to set the correct environment variables de
    ```bash
    export MONGO_HOST=localhost
    export MONGO_PORT=27018
+   export ENABLE_DB_TESTS=true
+   export MONGO_PASSWORD="your_valid_password"
    ```
 
 2. When running inside Docker containers:

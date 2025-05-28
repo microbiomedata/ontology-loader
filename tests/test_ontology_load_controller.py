@@ -158,6 +158,10 @@ def test_obsolete_handling_in_ontology_loader():
     subject_relations = relation_collection.find({"subject": "TEST:0000001"})
     assert subject_relations.num_rows == 0, "Found relations with obsolete term as subject"
 
+    class_collection.delete_many({"id": "TEST:0000001"})
+    class_collection.delete_many({"id": "TEST:0000002"})
+    relation_collection.delete_many({"subject": "TEST:0000001"})
+    relation_collection.delete_many({"object": "TEST:0000002"})
 
 def test_obsolete_handling_with_mocks():
     """Test obsolete term handling with mocks to check the expected behavior."""
