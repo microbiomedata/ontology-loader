@@ -190,6 +190,7 @@ def test_obsolete_handling_in_ontology_loader():
     relation_collection.delete({"subject": "TEST:0000001"})
     relation_collection.delete({"object": "TEST:0000002"})
 
+
 @pytest.mark.skip(reason="Test needs more complete mocking of MongoDB interaction")
 def test_ontology_loader_with_client(schema_view, ontology_loader_with_client, mock_mongo_client):
     """

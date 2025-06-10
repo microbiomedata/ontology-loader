@@ -36,6 +36,7 @@ class OntologyLoaderController:
             output_directory: Directory where reports will be written (default: temp directory)
             generate_reports: Whether to generate reports (default: True)
             mongo_client: Optional existing MongoDB client to use instead of creating a new connection
+
         """
         self.source_ontology = source_ontology
         self.output_directory = output_directory

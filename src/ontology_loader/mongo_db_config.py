@@ -13,6 +13,7 @@ class MongoDBConfig:
     _instance = None
 
     def __init__(self):
+        """Initialize the MongoDBConfig singleton instance."""
         self.existing_client = None
 
     def __new__(cls):
@@ -61,6 +62,7 @@ class MongoDBConfig:
 
         Args:
             client: An existing pymongo.MongoClient instance
+
         """
         self.existing_client = client
 
@@ -70,5 +72,6 @@ class MongoDBConfig:
 
         Returns:
             bool: True if an existing client is available, False otherwise
+
         """
         return self.existing_client is not None
