@@ -149,12 +149,21 @@ class MongoDBLoader:
         if mongo_client:
             self.db_config.set_existing_client(mongo_client)
 
-        # Setup the database connection
+        # Set up the database connection
         if self.db_config.has_existing_client():
             # Use the existing MongoDB client
             logger.info("Using existing MongoDB client")
-            # Create a handle using the database name from config
-            self.handle = f"mongodb://localhost:27017/{self.db_config.db_name}"
+
+            # Extract the connection details from the existing client
+            existing_client = self.db_config.existing_client
+            # The host_string should contain the actual host and port
+            host_string = existing_client.address[0]
+            port = existing_client.address[1]
+
+            # Create a handle using the actual connection details
+            self.handle = f"mongodb://{host_string}:{port}/{self.db_config.db_name}"
+            logger.info(f"Using existing client connection: {self.handle}")
+
             # Create a Client using the handle
             self.client = Client(handle=self.handle)
 
