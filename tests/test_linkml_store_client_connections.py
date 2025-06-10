@@ -8,7 +8,7 @@ from pymongo import MongoClient
 
 # MongoDB Connection Parameters
 MONGO_HOST = "localhost"
-MONGO_PORT = 27018
+MONGO_PORT = 27022
 MONGO_DB = "nmdc"  # Database where you want to insert/update
 MONGO_USER = "admin"
 MONGO_PASSWORD = os.getenv("MONGO_PASSWORD", "")
@@ -19,6 +19,7 @@ AUTH_DB = "admin"  # Authentication database
 def test_mongo_client():
     """Test MongoDB client connection from pymongo."""
     # Initialize the MongoDB client
+    print(f"Connecting to MongoDB at {MONGO_HOST}:{MONGO_PORT} with user {MONGO_USER}")
     client = MongoClient(
         host=f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}?authSource={AUTH_DB}&directConnection=true"
     )

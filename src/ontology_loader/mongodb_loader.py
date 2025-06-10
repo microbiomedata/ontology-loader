@@ -134,21 +134,46 @@ class MongoDBLoader:
 
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
-    def __init__(self, schema_view: Optional[SchemaView] = None):
+    def __init__(self, schema_view: Optional[SchemaView] = None, mongo_client=None):
         """
         Initialize MongoDB using LinkML-store's client, prioritizing environment variables for connection details.
 
         :param schema_view: LinkML SchemaView for ontology
+        :param mongo_client: Optional existing MongoDB client to use instead of creating a new connection
         """
         # Get database config from environment variables or fallback to MongoDBConfig defaults
         self.db_config = MongoDBConfig()
         self.schema_view = schema_view
 
-        self.handle = get_mongo_connection_string(self.db_config)
+        # If a MongoDB client was provided, store it in the config
+        if mongo_client:
+            self.db_config.set_existing_client(mongo_client)
 
-        logger.info(f"MongoDB connection string: {self.handle}")
-        self.client = Client(handle=self.handle)
-        self.db = self.client.attach_database(handle=self.handle)
+        # Setup the database connection
+        if self.db_config.has_existing_client():
+            # Use the existing MongoDB client
+            logger.info("Using existing MongoDB client")
+            # Create a handle using the database name from config
+            self.handle = f"mongodb://localhost:27017/{self.db_config.db_name}"
+            # Create a Client using the handle
+            self.client = Client(handle=self.handle)
+
+            # Access the mongodb database implementation
+            db = self.client.attach_database(handle=self.handle)
+
+            # Replace the native client with our existing one
+            # This will make all MongoDB operations use our existing client
+            mongodb_db = db
+            mongodb_db._native_client = self.db_config.existing_client
+            mongodb_db._native_db = self.db_config.existing_client[self.db_config.db_name]
+
+            self.db = db
+        else:
+            # Create a new connection using the connection string
+            self.handle = get_mongo_connection_string(self.db_config)
+            logger.info(f"MongoDB connection string: {self.handle}")
+            self.client = Client(handle=self.handle)
+            self.db = self.client.attach_database(handle=self.handle)
 
         logger.info(f"Connected to MongoDB: {self.db}")
 

@@ -51,7 +51,6 @@ The Docker container networking uses container names (like 'mongo') for internal
 % db.ontology_class_set.find( { id: { $regex: /^PO/ } } ).pretty()
 % db.ontology_class_set.find( { id: { $regex: /^UBERON/ } } ).pretty()
 % db.ontology_class_set.find( { id: { $regex: /^ENVO/ } } ).pretty()
-% db.ontology_class_set.find( { alternative_identifiers: { $exists: true, $ne: [] } } ).pretty()
 ``` 
 
 #### Command line
@@ -72,28 +71,54 @@ The Docker container networking uses container names (like 'mongo') for internal
 % make lint
 ```
 
-#### python example usage
+#### Python example usage
 ```bash
 pip install nmdc-ontology-loader
 ```
 
 ```python
-from  nmdc_ontology_loader.ontology_loader import OntologyLoader
+from ontology_loader.ontology_load_controller import OntologyLoaderController
 import tempfile
 
-def test_load_ontology():
-    """Test the load_ontology method."""
-    ontology_loader = OntologyLoader(
+def load_ontology():
+    """Load an ontology using the default MongoDB connection."""
+    loader = OntologyLoaderController(
         source_ontology="envo",
         output_directory=tempfile.gettempdir(),
         generate_reports=True,
     )
-    ontology_loader.load_ontology()
-    assert ontology_loader.ontology_class_set
-    assert ontology_loader.ontology_relation_set
-    assert ontology_loader.ontology_class_set.count() > 0
-    assert ontology_loader.ontology_relation_set.count() > 0
+    loader.run_ontology_loader()
 ```
+
+#### Using with an existing MongoDB connection
+
+If you already have a MongoDB connection established (e.g., in a Dagster/Dagit job), you can pass it directly to the OntologyLoaderController:
+
+```python
+from pymongo import MongoClient
+from ontology_loader.ontology_load_controller import OntologyLoaderController
+import tempfile
+
+# Use an existing MongoDB client
+mongo_client = MongoClient("mongodb://admin:password@localhost:27018/nmdc?authSource=admin")
+
+# Pass the client to OntologyLoaderController
+loader = OntologyLoaderController(
+    source_ontology="envo",
+    output_directory=tempfile.gettempdir(),
+    generate_reports=True,
+    mongo_client=mongo_client,  # Pass the existing client
+)
+
+# The loader will use the provided client instead of creating a new connection
+loader.run_ontology_loader()
+```
+
+This approach is particularly useful when:
+- You're running in a job scheduler like Dagster/Dagit
+- You want to reuse an existing connection pool
+- You have custom MongoDB connection settings that are managed externally
+- You need to use a connection with specific authentication or configuration
 
 ### Testing CRUD operations in a live MongoDB
 

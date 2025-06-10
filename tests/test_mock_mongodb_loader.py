@@ -16,6 +16,12 @@ def schema_view():
 
 
 @pytest.fixture()
+def mock_mongo_client():
+    """Create a mock MongoDB client."""
+    return MagicMock()
+
+
+@pytest.fixture()
 def mock_mongo_loader(schema_view):
     """Mock MongoDBLoader to prevent actual database interactions."""
     loader = MongoDBLoader(schema_view)
@@ -75,6 +81,23 @@ def mock_obsolete_classes():
         OntologyClass(id="ONT:002", name="Term2", type="nmdc:OntologyClass", is_obsolete=True),
         OntologyClass(id="ONT:003", name="Term3", type="nmdc:OntologyClass", is_obsolete=True),
     ]
+
+
+def test_init_with_existing_client(mock_mongo_client):
+    """
+    Test initializing MongoDBLoader with an existing MongoDB client.
+
+    :param mock_mongo_client: Mock MongoDB client.
+    """
+    # Create a MongoDBLoader with an existing client
+    loader = MongoDBLoader(mongo_client=mock_mongo_client)
+
+    # Verify the client was stored in the config
+    assert loader.db_config.has_existing_client()
+    assert loader.db_config.existing_client == mock_mongo_client
+
+    # Check that we're using the provided client in the MongoDB database
+    assert loader.db._native_client == mock_mongo_client
 
 
 def test_upsert_new_ontology_data(mock_db, mock_ontology_classes, mock_ontology_relations):
