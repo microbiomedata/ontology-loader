@@ -134,19 +134,26 @@ class MongoDBLoader:
 
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
-    def __init__(self, schema_view: Optional[SchemaView] = None, mongo_client=None):
+    def __init__(self, schema_view: Optional[SchemaView] = None, mongo_client=None, db_name: Optional[str] = None):
         """
         Initialize MongoDB using LinkML-store's client, prioritizing environment variables for connection details.
 
         :param schema_view: LinkML SchemaView for ontology
         :param mongo_client: Optional existing MongoDB client to use instead of creating a new connection
+        :param db_name: Required database name when using an existing client
         """
         # Get database config from environment variables or fallback to MongoDBConfig defaults
         self.db_config = MongoDBConfig()
         self.schema_view = schema_view
 
-        # If a MongoDB client was provided, store it in the config
+        # If a MongoDB client was provided
         if mongo_client:
+            # Database name is required when passing a client
+            if not db_name:
+                raise ValueError("Database name (db_name) is required when providing an existing MongoDB client")
+
+            # Set the database name and client in config
+            self.db_config.db_name = db_name
             self.db_config.set_existing_client(mongo_client)
 
         # Set up the database connection
@@ -160,7 +167,7 @@ class MongoDBLoader:
             host_string = existing_client.address[0]
             port = existing_client.address[1]
 
-            # Create a handle using the actual connection details
+            # Create a handle using the actual connection details and the provided db_name
             self.handle = f"mongodb://{host_string}:{port}/{self.db_config.db_name}"
             logger.info(f"Using existing client connection: {self.handle}")
 

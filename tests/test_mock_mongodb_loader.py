@@ -89,12 +89,13 @@ def test_init_with_existing_client(mock_mongo_client):
 
     :param mock_mongo_client: Mock MongoDB client.
     """
-    # Create a MongoDBLoader with an existing client
-    loader = MongoDBLoader(mongo_client=mock_mongo_client)
+    # Create a MongoDBLoader with an existing client and db_name
+    loader = MongoDBLoader(mongo_client=mock_mongo_client, db_name="test_db")
 
     # Verify the client was stored in the config
     assert loader.db_config.has_existing_client()
     assert loader.db_config.existing_client == mock_mongo_client
+    assert loader.db_config.db_name == "test_db"
 
     # Check that we're using the provided client in the MongoDB database
     assert loader.db._native_client == mock_mongo_client

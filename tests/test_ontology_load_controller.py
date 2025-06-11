@@ -59,6 +59,7 @@ def ontology_loader_with_client(mock_mongo_client):
         output_directory=tempfile.gettempdir(),
         generate_reports=True,
         mongo_client=mock_mongo_client,
+        db_name="test_db",
     )
 
 
@@ -208,8 +209,9 @@ def test_ontology_loader_with_client(schema_view, ontology_loader_with_client, m
     # We've already verified in test_init_with_existing_client that
     # MongoDBLoader properly uses an existing client when provided.
 
-    # Just verify that the client reference is maintained
+    # Just verify that the client reference and db_name are maintained
     assert ontology_loader_with_client.mongo_client == mock_mongo_client
+    assert ontology_loader_with_client.db_name == "test_db"
 
 
 def test_obsolete_handling_with_mocks():

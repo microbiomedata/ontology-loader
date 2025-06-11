@@ -27,6 +27,7 @@ class OntologyLoaderController:
         output_directory: str = tempfile.gettempdir(),
         generate_reports: bool = True,
         mongo_client=None,
+        db_name: str = None,
     ):
         """
         Set the parameters for the OntologyLoader.
@@ -36,12 +37,18 @@ class OntologyLoaderController:
             output_directory: Directory where reports will be written (default: temp directory)
             generate_reports: Whether to generate reports (default: True)
             mongo_client: Optional existing MongoDB client to use instead of creating a new connection
+            db_name: Database name to use with existing client (required when mongo_client is provided)
 
         """
         self.source_ontology = source_ontology
         self.output_directory = output_directory
         self.generate_reports = generate_reports
         self.mongo_client = mongo_client
+        self.db_name = db_name
+
+        # Validate that db_name is provided when mongo_client is provided
+        if self.mongo_client and not self.db_name:
+            raise ValueError("Database name (db_name) is required when providing a MongoDB client")
 
     def run_ontology_loader(self):
         """Run the OntologyLoader and insert data into MongoDB."""
@@ -63,7 +70,7 @@ class OntologyLoaderController:
         logger.info(f"Extracted {len(ontology_relations)} ontology relations.")
 
         # Connect to MongoDB, using the existing client if provided
-        db_manager = MongoDBLoader(schema_view=nmdc_sv, mongo_client=self.mongo_client)
+        db_manager = MongoDBLoader(schema_view=nmdc_sv, mongo_client=self.mongo_client, db_name=self.db_name)
 
         # Only log connection details if we're using our own connection
         if not self.mongo_client:

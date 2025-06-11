@@ -42,7 +42,7 @@ The Docker container networking uses container names (like 'mongo') for internal
 #### Basic mongosh commands
 ```bash
 % docker ps
-% docker exec -it [mongodb-container-id] bash
+%   [mongodb-container-id] bash
 % mongosh mongodb://admin:root@mongo:27017/nmdc?authSource=admin
 % show dbs
 % use nmdc
@@ -102,12 +102,13 @@ import tempfile
 # Use an existing MongoDB client
 mongo_client = MongoClient("mongodb://admin:password@localhost:27018/nmdc?authSource=admin")
 
-# Pass the client to OntologyLoaderController
+# Pass the client and database name to OntologyLoaderController
 loader = OntologyLoaderController(
     source_ontology="envo",
     output_directory=tempfile.gettempdir(),
     generate_reports=True,
     mongo_client=mongo_client,  # Pass the existing client
+    db_name="nmdc",  # Required when passing an existing client
 )
 
 # The loader will use the provided client instead of creating a new connection
@@ -119,6 +120,8 @@ This approach is particularly useful when:
 - You want to reuse an existing connection pool
 - You have custom MongoDB connection settings that are managed externally
 - You need to use a connection with specific authentication or configuration
+
+> **Note**: When passing an existing MongoDB client, you must also provide the `db_name` parameter to specify which database to use. This is required as the database name cannot be automatically determined from a MongoDB client instance.
 
 ### Testing CRUD operations in a live MongoDB
 
