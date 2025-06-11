@@ -12,6 +12,10 @@ class MongoDBConfig:
 
     _instance = None
 
+    def __init__(self):
+        """Initialize the MongoDBConfig singleton instance."""
+        self.existing_client = None
+
     def __new__(cls):
         """Create a new instance of MongoDBConfig if it does not exist."""
         if cls._instance is None:
@@ -20,7 +24,7 @@ class MongoDBConfig:
             cls._instance.db_user = os.getenv("MONGO_USERNAME", "admin")
             cls._instance.db_password = os.getenv("MONGO_PASSWORD", "")
             cls._instance.db_host = os.getenv("MONGO_HOST", "localhost")
-            cls._instance.db_port = int(os.getenv("MONGO_PORT", 27018))
+            cls._instance.db_port = int(os.getenv("MONGO_PORT", 27022))
             cls._instance.replica_set = os.getenv("MONGO_REPLICA_SET", "")
             # Build connection parameters based on whether replica set is defined
             if cls._instance.replica_set:
@@ -49,3 +53,25 @@ class MongoDBConfig:
                 ]
             cls._instance.auth_params = "&".join(cls._instance.connection_params)
         return cls._instance
+
+    def set_existing_client(self, client):
+        """
+        Set an existing MongoDB client instance.
+
+        When set, this client will be used instead of creating a new connection.
+
+        Args:
+            client: An existing pymongo.MongoClient instance
+
+        """
+        self.existing_client = client
+
+    def has_existing_client(self):
+        """
+        Check if an existing MongoDB client has been set.
+
+        Returns:
+            bool: True if an existing client is available, False otherwise
+
+        """
+        return self.existing_client is not None

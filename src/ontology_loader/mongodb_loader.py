@@ -134,21 +134,62 @@ class MongoDBLoader:
 
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
-    def __init__(self, schema_view: Optional[SchemaView] = None):
+    def __init__(self, schema_view: Optional[SchemaView] = None, mongo_client=None, db_name: Optional[str] = None):
         """
         Initialize MongoDB using LinkML-store's client, prioritizing environment variables for connection details.
 
         :param schema_view: LinkML SchemaView for ontology
+        :param mongo_client: Optional existing MongoDB client to use instead of creating a new connection
+        :param db_name: Required database name when using an existing client
         """
         # Get database config from environment variables or fallback to MongoDBConfig defaults
         self.db_config = MongoDBConfig()
         self.schema_view = schema_view
 
-        self.handle = get_mongo_connection_string(self.db_config)
+        # If a MongoDB client was provided
+        if mongo_client:
+            # Database name is required when passing a client
+            if not db_name:
+                raise ValueError("Database name (db_name) is required when providing an existing MongoDB client")
 
-        logger.info(f"MongoDB connection string: {self.handle}")
-        self.client = Client(handle=self.handle)
-        self.db = self.client.attach_database(handle=self.handle)
+            # Set the database name and client in config
+            self.db_config.db_name = db_name
+            self.db_config.set_existing_client(mongo_client)
+
+        # Set up the database connection
+        if self.db_config.has_existing_client():
+            # Use the existing MongoDB client
+            logger.info("Using existing MongoDB client")
+
+            # Extract the connection details from the existing client
+            existing_client = self.db_config.existing_client
+            # The host_string should contain the actual host and port
+            host_string = existing_client.address[0]
+            port = existing_client.address[1]
+
+            # Create a handle using the actual connection details and the provided db_name
+            self.handle = f"mongodb://{host_string}:{port}/{self.db_config.db_name}"
+            logger.info(f"Using existing client connection: {self.handle}")
+
+            # Create a Client using the handle
+            self.client = Client(handle=self.handle)
+
+            # Access the mongodb database implementation
+            db = self.client.attach_database(handle=self.handle)
+
+            # Replace the native client with our existing one
+            # This will make all MongoDB operations use our existing client
+            mongodb_db = db
+            mongodb_db._native_client = self.db_config.existing_client
+            mongodb_db._native_db = self.db_config.existing_client[self.db_config.db_name]
+
+            self.db = db
+        else:
+            # Create a new connection using the connection string
+            self.handle = get_mongo_connection_string(self.db_config)
+            logger.info(f"MongoDB connection string: {self.handle}")
+            self.client = Client(handle=self.handle)
+            self.db = self.client.attach_database(handle=self.handle)
 
         logger.info(f"Connected to MongoDB: {self.db}")
 
