@@ -42,7 +42,7 @@ The Docker container networking uses container names (like 'mongo') for internal
 #### Basic mongosh commands
 ```bash
 % docker ps
-%   [mongodb-container-id] bash
+% docker exec -it [mongodb-container-id] bash
 % mongosh mongodb://admin:root@mongo:27017/nmdc?authSource=admin
 % show dbs
 % use nmdc
