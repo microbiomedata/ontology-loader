@@ -136,25 +136,20 @@ class MongoDBLoader:
 
     def __init__(self, schema_view: Optional[SchemaView] = None, mongo_client=None, db_name: Optional[str] = None):
         """
-        Initialize MongoDB using LinkML-store's client, prioritizing environment variables for connection details.
+        Initialize MongoDB connection, auto-detecting whether to use provided client or create new connection.
 
         :param schema_view: LinkML SchemaView for ontology
-        :param mongo_client: Optional existing MongoDB client to use instead of creating a new connection
-        :param db_name: Required database name when using an existing client
+        :param mongo_client: Optional existing MongoDB client - if provided, uses this instead of creating new connection
+        :param db_name: Database name - required when mongo_client is provided, otherwise read from environment
         """
-        # Get database config from environment variables or fallback to MongoDBConfig defaults
-        self.db_config = MongoDBConfig()
         self.schema_view = schema_view
 
-        # If a MongoDB client was provided
-        if mongo_client:
-            # Database name is required when passing a client
-            if not db_name:
-                raise ValueError("Database name (db_name) is required when providing an existing MongoDB client")
-
-            # Set the database name and client in config
-            self.db_config.db_name = db_name
-            self.db_config.set_existing_client(mongo_client)
+        # Database name is required when passing a client
+        if mongo_client and not db_name:
+            raise ValueError("Database name (db_name) is required when providing an existing MongoDB client")
+        
+        # Create config - only reads environment variables if no client is provided
+        self.db_config = MongoDBConfig(mongo_client=mongo_client, db_name=db_name)
 
         # Set up the database connection
         if self.db_config.has_existing_client():

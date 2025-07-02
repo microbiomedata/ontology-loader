@@ -36,8 +36,8 @@ class OntologyLoaderController:
             source_ontology: Name of the ontology to load (default: "envo")
             output_directory: Directory where reports will be written (default: temp directory)
             generate_reports: Whether to generate reports (default: True)
-            mongo_client: Optional existing MongoDB client to use instead of creating a new connection
-            db_name: Database name to use with existing client (required when mongo_client is provided)
+            mongo_client: Optional existing MongoDB client - if provided, uses this client instead of creating new connection
+            db_name: Database name - required when mongo_client is provided, otherwise read from environment
 
         """
         self.source_ontology = source_ontology

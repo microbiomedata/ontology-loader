@@ -21,12 +21,13 @@ specified by NMDC schema.
 
 #### MongoDB Connection Settings
 
-When connecting to MongoDB, you need to set the correct environment variables depending on where your code is running:
+When connecting to MongoDB, you need to set the correct environment variables depending on where your code is 
+running:
 
 1. When running from your local machine (CLI or tests):
    ```bash
    export MONGO_HOST=localhost
-   export MONGO_PORT=27018
+   export MONGO_PORT=27022
    export ENABLE_DB_TESTS=true
    export MONGO_PASSWORD="your_valid_password"
    ```
@@ -34,7 +35,7 @@ When connecting to MongoDB, you need to set the correct environment variables de
 2. When running inside Docker containers:
    ```bash
    export MONGO_HOST=mongo
-   export MONGO_PORT=27017
+   export MONGO_PORT=27022
    ```
 
 The Docker container networking uses container names (like 'mongo') for internal communication, while your host machine must use 'localhost' with the mapped port (27018).

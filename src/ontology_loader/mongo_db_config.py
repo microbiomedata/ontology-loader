@@ -8,30 +8,43 @@ logger = logging.getLogger(__name__)
 
 class MongoDBConfig:
 
-    """Singleton class to store default parameters accessed from client environment or sensible defaults."""
+    """MongoDB configuration class - minimal by default, only reads environment variables when no client is provided."""
 
-    _instance = None
-
-    def __init__(self):
-        """Initialize the MongoDBConfig singleton instance."""
-        self.existing_client = None
-
-    def __new__(cls):
-        """Create a new instance of MongoDBConfig if it does not exist."""
-        if cls._instance is None:
-            cls._instance = super(MongoDBConfig, cls).__new__(cls)
-            cls._instance.db_name = os.getenv("MONGO_DB", "nmdc")
-            cls._instance.db_user = os.getenv("MONGO_USERNAME", "admin")
-            cls._instance.db_password = os.getenv("MONGO_PASSWORD", "")
-            cls._instance.db_host = os.getenv("MONGO_HOST", "localhost")
-            cls._instance.db_port = int(os.getenv("MONGO_PORT", 27022))
-            cls._instance.replica_set = os.getenv("MONGO_REPLICA_SET", "")
+    def __init__(self, mongo_client=None, db_name=None):
+        """Initialize the MongoDBConfig instance."""
+        self.existing_client = mongo_client
+        
+        # Only read environment variables if no client is provided
+        if not mongo_client:
+            self.db_name = os.getenv("MONGO_DB", "nmdc")
+            self.db_user = os.getenv("MONGO_USERNAME", "admin")
+            self.db_password = os.getenv("MONGO_PASSWORD", "")
+            self.db_host = os.getenv("MONGO_HOST", "localhost")
+            # Defensive parsing of MONGO_PORT - handle various formats
+            mongo_port_env = os.getenv("MONGO_PORT", "27022")
+            try:
+                # Try to parse as integer first
+                self.db_port = int(mongo_port_env)
+            except ValueError:
+                # If that fails, try to extract port from URL formats
+                if ":" in mongo_port_env:
+                    # Handle formats like "tcp://host:port", "mongodb://host:port", etc.
+                    try:
+                        self.db_port = int(mongo_port_env.split(":")[-1])
+                        logger.info(f"Extracted port {self.db_port} from {mongo_port_env}")
+                    except (ValueError, IndexError):
+                        logger.warning(f"Could not parse port from {mongo_port_env}, using default 27022")
+                        self.db_port = 27022
+                else:
+                    logger.warning(f"Could not parse port from {mongo_port_env}, using default 27022")
+                    self.db_port = 27022
+            self.replica_set = os.getenv("MONGO_REPLICA_SET", "")
             # Build connection parameters based on whether replica set is defined
-            if cls._instance.replica_set:
+            if self.replica_set:
                 # Replica set parameters
-                cls._instance.connection_params = [
+                self.connection_params = [
                     "authSource=admin",
-                    "replicaSet=" + cls._instance.replica_set,
+                    "replicaSet=" + self.replica_set,
                     # Connect directly to the server, don't attempt replica set discovery
                     # which would fail due to port forwarding
                     "directConnection=true",
@@ -46,13 +59,15 @@ class MongoDBConfig:
                 ]
             else:
                 # Standalone parameters
-                cls._instance.connection_params = [
+                self.connection_params = [
                     "authSource=admin",
                     "directConnection=true",
                     "connectTimeoutMS=5000",
                 ]
-            cls._instance.auth_params = "&".join(cls._instance.connection_params)
-        return cls._instance
+            self.auth_params = "&".join(self.connection_params)
+        else:
+            # Client provided - use the provided db_name
+            self.db_name = db_name
 
     def set_existing_client(self, client):
         """
