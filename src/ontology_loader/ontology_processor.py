@@ -134,12 +134,29 @@ class OntologyProcessor:
 
         return ontology_classes
 
-    def get_relations_closure(self, predicates=None, ontology_terms: list = None) -> tuple:
+    def get_relations_closure(
+        self,
+        predicates=None,
+        ontology_terms: list = None,
+        emit_combined_closure: bool = True,
+        emit_isa_closure: bool = False,
+        emit_partof_closure: bool = False,
+    ) -> tuple:
         """
         Retrieve all ontology relations closure for terms with improved performance.
 
-        :param predicates: List of predicates to consider (default: ["rdfs:subClassOf", "BFO:0000050"])
+        :param predicates: Predicates to filter the direct-edge phase by (default:
+            ["rdfs:subClassOf", "BFO:0000050"]). Does not affect which entailed
+            closures are emitted; that is controlled by the three emit_* flags.
         :param ontology_terms: List of OntologyClass objects to consider (default: None)
+        :param emit_combined_closure: If True (default), emit
+            `entailed_isa_partof_closure` relations covering the combined
+            transitive closure over `rdfs:subClassOf` ∪ `BFO:0000050`.
+            Backward-compatible default.
+        :param emit_isa_closure: If True, additionally emit `entailed_isa_closure`
+            relations covering the transitive closure over `rdfs:subClassOf` only.
+        :param emit_partof_closure: If True, additionally emit `entailed_partof_closure`
+            relations covering the transitive closure over `BFO:0000050` only.
         :return: Tuple of (ontology_relations, updated_ontology_terms)
         """
         predicates = ["rdfs:subClassOf", "BFO:0000050"] if predicates is None else predicates
@@ -168,25 +185,41 @@ class OntologyProcessor:
 
         logger.info(f"Processed {relationship_count} direct relationships")
 
-        # Process all ancestors for all entities in one batch
-        logger.info("Processing ancestry relationships...")
-        ancestry_count = 0
+        # Build the list of (output_predicate_name, ancestry_predicates) closures
+        # the caller asked for. Each requires its own ancestors() traversal per entity.
+        closure_specs = []
+        if emit_combined_closure:
+            closure_specs.append(("entailed_isa_partof_closure", ["rdfs:subClassOf", "BFO:0000050"]))
+        if emit_isa_closure:
+            closure_specs.append(("entailed_isa_closure", ["rdfs:subClassOf"]))
+        if emit_partof_closure:
+            closure_specs.append(("entailed_partof_closure", ["BFO:0000050"]))
 
-        for entity in relevant_entities:
-            # Get ancestors for this entity and filter to only include those from our ontology
-            ancestors = set(
-                ancestor
-                for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=predicates)
-                if ancestor.startswith(ontology_prefix)
+        if closure_specs:
+            logger.info(
+                f"Processing ancestry relationships across {len(closure_specs)} closure type(s): "
+                f"{', '.join(name for name, _ in closure_specs)}"
             )
+            ancestry_count = 0
+            for entity in relevant_entities:
+                for closure_name, closure_predicates in closure_specs:
+                    ancestors = set(
+                        ancestor
+                        for ancestor in self.adapter.ancestors(
+                            entity, reflexive=True, predicates=closure_predicates
+                        )
+                        if ancestor.startswith(ontology_prefix)
+                    )
+                    for ancestor in ancestors:
+                        relation_dict = _create_relation(
+                            entity, closure_name, ancestor, ontology_terms_dict
+                        )
+                        ontology_relations.append(relation_dict)
+                        ancestry_count += 1
+            logger.info(f"Processed {ancestry_count} ancestry relationships")
+        else:
+            logger.info("No ancestry closure types enabled; skipping ancestry computation.")
 
-            # Create relations for each ancestor
-            for ancestor in ancestors:
-                relation_dict = _create_relation(entity, "entailed_isa_partof_closure", ancestor, ontology_terms_dict)
-                ontology_relations.append(relation_dict)
-                ancestry_count += 1
-
-        logger.info(f"Processed {ancestry_count} ancestry relationships")
         logger.info(f"Total relations: {len(ontology_relations)}")
 
         # Return the relations and updated ontology terms

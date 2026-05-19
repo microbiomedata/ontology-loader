@@ -28,6 +28,9 @@ class OntologyLoaderController:
         generate_reports: bool = True,
         mongo_client=None,
         db_name: str = None,
+        emit_combined_closure: bool = True,
+        emit_isa_closure: bool = False,
+        emit_partof_closure: bool = False,
     ):
         """
         Set the parameters for the OntologyLoader.
@@ -38,6 +41,9 @@ class OntologyLoaderController:
             generate_reports: Whether to generate reports (default: True)
             mongo_client: Optional existing MongoDB client to use instead of creating a new connection
             db_name: Database name to use with existing client (required when mongo_client is provided)
+            emit_combined_closure: Emit `entailed_isa_partof_closure` (default True; backward compatible).
+            emit_isa_closure: Also emit `entailed_isa_closure` (rdfs:subClassOf only). Default False.
+            emit_partof_closure: Also emit `entailed_partof_closure` (BFO:0000050 only). Default False.
 
         """
         self.source_ontology = source_ontology
@@ -45,6 +51,9 @@ class OntologyLoaderController:
         self.generate_reports = generate_reports
         self.mongo_client = mongo_client
         self.db_name = db_name
+        self.emit_combined_closure = emit_combined_closure
+        self.emit_isa_closure = emit_isa_closure
+        self.emit_partof_closure = emit_partof_closure
 
         # Validate that db_name is provided when mongo_client is provided
         if self.mongo_client and not self.db_name:
@@ -64,7 +73,10 @@ class OntologyLoaderController:
 
         # Process ontology relations and create OntologyRelation objects
         ontology_relations, ontology_classes_relations = processor.get_relations_closure(
-            ontology_terms=ontology_classes
+            ontology_terms=ontology_classes,
+            emit_combined_closure=self.emit_combined_closure,
+            emit_isa_closure=self.emit_isa_closure,
+            emit_partof_closure=self.emit_partof_closure,
         )
 
         logger.info(f"Extracted {len(ontology_relations)} ontology relations.")
