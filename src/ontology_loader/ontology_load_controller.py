@@ -28,6 +28,7 @@ class OntologyLoaderController:
         generate_reports: bool = True,
         mongo_client=None,
         db_name: str = None,
+        report_mode: str = "compared",
     ):
         """
         Set the parameters for the OntologyLoader.
@@ -38,6 +39,8 @@ class OntologyLoaderController:
             generate_reports: Whether to generate reports (default: True)
             mongo_client: Optional existing MongoDB client to use instead of creating a new connection
             db_name: Database name to use with existing client (required when mongo_client is provided)
+            report_mode: 'compared' (default; preserves no-change skip), 'upsert' (max throughput),
+                or 'off' (no report tracking). See `MongoDBLoader.upsert_ontology_data`.
 
         """
         self.source_ontology = source_ontology
@@ -45,6 +48,7 @@ class OntologyLoaderController:
         self.generate_reports = generate_reports
         self.mongo_client = mongo_client
         self.db_name = db_name
+        self.report_mode = report_mode
 
         # Validate that db_name is provided when mongo_client is provided
         if self.mongo_client and not self.db_name:

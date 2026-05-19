@@ -5,7 +5,11 @@ from unittest.mock import MagicMock
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 
-from ontology_loader.mongodb_loader import MongoDBLoader, Report, _handle_obsolete_terms
+from ontology_loader.mongodb_loader import (
+    MongoDBLoader,
+    Report,
+    _handle_obsolete_terms,
+)
 from ontology_loader.utils import load_yaml_from_package
 
 
@@ -21,35 +25,69 @@ def mock_mongo_client():
     return MagicMock()
 
 
-@pytest.fixture()
-def mock_mongo_loader(schema_view):
-    """Mock MongoDBLoader to prevent actual database interactions."""
-    loader = MongoDBLoader(schema_view)
-    loader.client = MagicMock()
-    loader.db = MagicMock()
-    loader.db.get_collection = MagicMock()
-    return loader
-
-
 @pytest.fixture
 def mock_db():
-    """
-    Mock database.
-
-    :return: Mock database.
-    """
+    """Mock linkml_store database used for obsolete-term handling."""
     db = MagicMock()
     db.create_collection.return_value = MagicMock()
     return db
 
 
 @pytest.fixture
-def mock_ontology_classes():
+def mock_py_db_factory():
     """
-    Mock ontology classes.
+    Return a factory that builds a MagicMock acting as a pymongo Database.
 
-    :return: List of OntologyClass objects.
+    Default behavior:
+        - `<db>[name].find({...})` returns iter([]) (no existing docs)
+        - `<db>[name].bulk_write(ops, ...)` returns a BulkWriteResult-like
+          mock whose `upserted_ids` covers every op index (all inserts).
+    Tests can override per-collection behavior via the returned helpers.
     """
+
+    def make(find_results=None, upserted_all=True):
+        """
+        Build a mock pymongo Database with configurable find/bulk_write responses.
+
+        :param find_results: mapping of collection_name -> list of existing docs
+            returned by ``find``. Defaults to empty for any collection.
+        :param upserted_all: whether bulk_write returns all-inserted by default.
+        """
+        find_results = find_results or {}
+        collection_cache: dict = {}
+
+        def _collection_factory(name):
+            if name in collection_cache:
+                return collection_cache[name]
+            collection = MagicMock()
+
+            def _find(query):
+                return iter(find_results.get(name, []))
+
+            collection.find.side_effect = _find
+
+            def _bulk_write(ops, ordered=False):
+                result = MagicMock()
+                if upserted_all:
+                    result.upserted_ids = {i: f"oid-{i}" for i in range(len(ops))}
+                else:
+                    result.upserted_ids = {}
+                return result
+
+            collection.bulk_write.side_effect = _bulk_write
+            collection_cache[name] = collection
+            return collection
+
+        py_db = MagicMock()
+        py_db.__getitem__.side_effect = _collection_factory
+        return py_db
+
+    return make
+
+
+@pytest.fixture
+def mock_ontology_classes():
+    """Mock ontology classes."""
     return [
         OntologyClass(id="ONT:001", name="Term1", type="nmdc:OntologyClass"),
         OntologyClass(id="ONT:002", name="Term2", type="nmdc:OntologyClass"),
@@ -58,11 +96,7 @@ def mock_ontology_classes():
 
 @pytest.fixture
 def mock_ontology_relations():
-    """
-    Mock ontology relations.
-
-    :return: List of OntologyRelation objects.
-    """
+    """Mock ontology relations."""
     return [
         OntologyRelation(subject="ONT:001", predicate="related_to", object="ONT:002", type="nmdc:OntologyRelation"),
         OntologyRelation(subject="ONT:002", predicate="part_of", object="ONT:003", type="nmdc:OntologyRelation"),
@@ -71,11 +105,7 @@ def mock_ontology_relations():
 
 @pytest.fixture
 def mock_obsolete_classes():
-    """
-    Mock ontology classes with obsolete terms.
-
-    :return: List of OntologyClass objects.
-    """
+    """Mock ontology classes with obsolete terms."""
     return [
         OntologyClass(id="ONT:001", name="Term1", type="nmdc:OntologyClass"),
         OntologyClass(id="ONT:002", name="Term2", type="nmdc:OntologyClass", is_obsolete=True),
@@ -84,164 +114,99 @@ def mock_obsolete_classes():
 
 
 def test_init_with_existing_client(mock_mongo_client):
-    """
-    Test initializing MongoDBLoader with an existing MongoDB client.
-
-    :param mock_mongo_client: Mock MongoDB client.
-    """
-    # Create a MongoDBLoader with an existing client and db_name
+    """Initializing MongoDBLoader with an existing MongoDB client stores it on the config."""
     loader = MongoDBLoader(mongo_client=mock_mongo_client, db_name="test_db")
 
-    # Verify the client was stored in the config
     assert loader.db_config.has_existing_client()
     assert loader.db_config.existing_client == mock_mongo_client
     assert loader.db_config.db_name == "test_db"
-
-    # Check that we're using the provided client in the MongoDB database
     assert loader.db._native_client == mock_mongo_client
 
 
-def test_upsert_new_ontology_data(mock_db, mock_ontology_classes, mock_ontology_relations):
-    """
-    Test upserting new ontology data.
-
-    :param mock_db: Mock database.
-    :param mock_ontology_classes: Mock ontology classes.
-    :param mock_ontology_relations: Mock ontology relations.
-    """
+def test_upsert_new_ontology_data(mock_db, mock_py_db_factory, mock_ontology_classes, mock_ontology_relations):
+    """All-new classes and relations land in the inserts reports under 'compared' mode."""
     loader = MongoDBLoader()
     loader.db = mock_db
-    class_collection = mock_db.create_collection.return_value
-
-    mock_query_result = MagicMock()
-    mock_query_result.rows = []
-    mock_query_result.num_rows = 0  # Ensuring num_rows behaves like an integer
-
-    class_collection.find.return_value = mock_query_result  # Mocking find() response
+    loader._py_db = mock_py_db_factory()  # default: no existing docs, all inserts
 
     report = loader.upsert_ontology_data(mock_ontology_classes, mock_ontology_relations)
 
-    assert isinstance(report[0], Report)  # Class updates report
-    assert isinstance(report[1], Report)  # Class insertions report
-    assert isinstance(report[2], Report)  # Relation insertions report
-    assert len(report[1].records) == len(mock_ontology_classes)  # All classes inserted
-    assert len(report[2].records) == len(mock_ontology_relations)  # All relations inserted
+    assert isinstance(report[0], Report)
+    assert isinstance(report[1], Report)
+    assert isinstance(report[2], Report)
+    assert len(report[0].records) == 0  # no updates
+    assert len(report[1].records) == len(mock_ontology_classes)  # all classes inserted
+    assert len(report[2].records) == len(mock_ontology_relations)  # all relations inserted
 
 
-def test_upsert_existing_ontology_data(mock_db, mock_ontology_classes):
-    """
-    Test upserting existing ontology data.
-
-    :param mock_db: Mock database.
-    :param mock_ontology_classes: Mock ontology classes.
-    """
+def test_upsert_existing_ontology_data(mock_db, mock_py_db_factory, mock_ontology_classes):
+    """When every input class has a matching existing doc with different fields, they all go to updates."""
+    existing_docs = [
+        {"id": "ONT:001", "name": "OldTerm1", "type": "nmdc:OntologyClass"},
+        {"id": "ONT:002", "name": "OldTerm2", "type": "nmdc:OntologyClass"},
+    ]
     loader = MongoDBLoader()
     loader.db = mock_db
-    class_collection = mock_db.create_collection.return_value
-
-    existing_doc = {"id": "ONT:001", "name": "OldTerm", "type": "nmdc:OntologyClass"}
-
-    mock_query_result = MagicMock()
-    mock_query_result.rows = [existing_doc]
-    mock_query_result.num_rows = 1  # Ensuring num_rows behaves like an integer
-
-    class_collection.find.return_value = mock_query_result  # Mocking find() response
+    loader._py_db = mock_py_db_factory(find_results={"ontology_class_set": existing_docs})
 
     report = loader.upsert_ontology_data(mock_ontology_classes, [])
-    assert len(report[0].records) == 2  # One record should be updated
-    assert len(report[1].records) == 0  # One record should be inserted (new class)
+
+    assert len(report[0].records) == 2  # both classes updated (name differs)
+    assert len(report[1].records) == 0  # no inserts
 
 
-def test_handle_disappearing_relations(mock_db, mock_ontology_classes, mock_ontology_relations):
-    """
-    Test handling of disappearing relations.
-
-    :param mock_db: Mock database.
-    :param mock_ontology_classes: Mock ontology classes.
-    :param mock_ontology_relations: Mock ontology relations.
-    """
+def test_upsert_with_report_mode_off(mock_db, mock_py_db_factory, mock_ontology_classes, mock_ontology_relations):
+    """`report_mode='off'` should produce empty report lists and still call bulk_write."""
     loader = MongoDBLoader()
     loader.db = mock_db
-    relation_collection = mock_db.create_collection.return_value
+    loader._py_db = mock_py_db_factory()
 
-    mock_query_result = MagicMock()
-    mock_query_result.rows = [
-        {
-            "subject": "ONT:001",
-            "predicate": "entailed_isa_partof_closure",
-            "object": "ONT:002",
-            "type": "nmdc:OntologyRelation",
-        },
-        {
-            "subject": "ONT:002",
-            "predicate": "entailed_isa_partof_closure",
-            "object": "ONT:003",
-            "type": "nmdc:OntologyRelation",
-        },
-    ]
-    mock_query_result.num_rows = 2  # Ensuring num_rows behaves like an integer
+    report = loader.upsert_ontology_data(mock_ontology_classes, mock_ontology_relations, report_mode="off")
 
-    relation_collection.find.return_value = mock_query_result  # Mocking find() response
-    relation_collection.upsert = MagicMock()  # Mock upsert method
+    assert len(report[0].records) == 0
+    assert len(report[1].records) == 0
+    assert len(report[2].records) == 0
+    # bulk_write was invoked for both collections
+    assert loader._py_db["ontology_class_set"].bulk_write.called
+    assert loader._py_db["ontology_relation_set"].bulk_write.called
 
-    updated_relations = [
-        OntologyRelation(subject="ONT:001", predicate="related_to", object="ONT:003", type="nmdc:OntologyRelation")
-        # Changed relation
-    ]
 
-    def mock_upsert(data, filter_fields, update_fields=None):
-        """
-        Simulate relation updates.
+def test_upsert_with_report_mode_upsert(mock_db, mock_py_db_factory, mock_ontology_classes):
+    """`report_mode='upsert'` skips the pre-read and classifies via BulkWriteResult."""
+    loader = MongoDBLoader()
+    loader.db = mock_db
+    loader._py_db = mock_py_db_factory()  # all inserts
 
-        :param data: Data to upsert.
-        :param filter_fields: Fields to filter on.
-        :param update_fields: Fields to update.
-        """
-        for obj in data:
-            if "subject" in obj:
-                for ontology_class in mock_ontology_classes:
-                    if ontology_class.id == obj["subject"]:
-                        ontology_class.relations = [
-                            OntologyRelation(
-                                subject=obj["subject"],
-                                predicate=obj["predicate"],
-                                object=obj["object"],
-                                type="nmdc:OntologyRelation",
-                            )
-                        ]
+    report = loader.upsert_ontology_data(mock_ontology_classes, [], report_mode="upsert")
 
-    relation_collection.upsert.side_effect = mock_upsert  # Simulate relation updates
+    # No pre-read should have happened
+    assert not loader._py_db["ontology_class_set"].find.called
+    assert len(report[1].records) == len(mock_ontology_classes)
 
-    loader.upsert_ontology_data(mock_ontology_classes, updated_relations)
 
-    # Ensure upsert was called
-    relation_collection.upsert.assert_called()
+def test_upsert_rejects_unknown_report_mode(mock_db, mock_py_db_factory, mock_ontology_classes):
+    """An unrecognized report_mode raises ValueError before any DB call."""
+    loader = MongoDBLoader()
+    loader.db = mock_db
+    loader._py_db = mock_py_db_factory()
 
-    # Verify old relations were replaced
-    assert len(mock_ontology_classes[0].relations) == 1
-    assert mock_ontology_classes[0].relations[0].object == "ONT:003"
+    with pytest.raises(ValueError, match="report_mode"):
+        loader.upsert_ontology_data(mock_ontology_classes, [], report_mode="bogus")
 
 
 def test_handle_obsolete_terms_function(mock_db):
-    """
-    Test the _handle_obsolete_terms function directly.
-
-    :param mock_db: Mock database.
-    """
+    """`_handle_obsolete_terms` marks terms obsolete and clears their relations."""
     class_collection = mock_db.create_collection.return_value
     relation_collection = mock_db.create_collection.return_value
 
-    # Create a proper OntologyClass object
     term_obj = OntologyClass(id="ONT:001", name="Term1", type="nmdc:OntologyClass", is_obsolete=False)
-    term_obj.relations = ["some_relation"]  # Add relations attribute
+    term_obj.relations = ["some_relation"]
 
-    # Set up the find method to return the term_obj
     mock_query_result = MagicMock()
     mock_query_result.rows = [term_obj]
     mock_query_result.num_rows = 1
     class_collection.find.return_value = mock_query_result
 
-    # Capture what gets passed to upsert to verify changes
     upserted_data = None
 
     def capture_upsert(data, filter_fields, update_fields=None):
@@ -250,72 +215,48 @@ def test_handle_obsolete_terms_function(mock_db):
 
     class_collection.upsert.side_effect = capture_upsert
 
-    # Test with list of obsolete terms
     obsolete_terms = ["ONT:001", "ONT:002"]
     _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection)
 
-    # Function creates a new dict from the original object, so the original stays unchanged
-    # But we can check what was passed to upsert
     assert upserted_data is not None, "No data was passed to upsert"
-    assert upserted_data["is_obsolete"] is True, "Term was not marked as obsolete"
-    assert upserted_data["relations"] == [], "Relations were not cleared"
-
-    # Verify class collection upsert was called
+    assert upserted_data["is_obsolete"] is True
+    assert upserted_data["relations"] == []
     class_collection.upsert.assert_called()
-
-    # Verify relation collection had delete called
     relation_collection.delete.assert_called_with(
         {"$or": [{"subject": {"$in": obsolete_terms}}, {"object": {"$in": obsolete_terms}}]}
     )
 
 
-def test_upsert_ontology_data_with_obsolete_terms(mock_db, mock_obsolete_classes, mock_ontology_relations):
-    """
-    Test upserting ontology data with obsolete terms.
-
-    :param mock_db: Mock database.
-    :param mock_obsolete_classes: Mock ontology classes with obsolete terms.
-    :param mock_ontology_relations: Mock ontology relations.
-    """
+def test_upsert_ontology_data_with_obsolete_terms(
+    mock_db, mock_py_db_factory, mock_obsolete_classes, mock_ontology_relations
+):
+    """`upsert_ontology_data` invokes obsolete handling on linkml_store and bulk writes on pymongo."""
     loader = MongoDBLoader()
     loader.db = mock_db
+    loader._py_db = mock_py_db_factory()
+
     class_collection = mock_db.create_collection.return_value
     relation_collection = mock_db.create_collection.return_value
 
-    # Since we're going to check multiple calls to find with different params,
-    # we need a more sophisticated mock that can return different results
+    # Obsolete handling reads each obsolete term via linkml_store find; return empty for both.
     def mock_find(criteria):
-        # Return empty result for any query
-        mock_result = MagicMock()
-        mock_result.rows = []
-        mock_result.num_rows = 0
-        return mock_result
+        result = MagicMock()
+        result.rows = []
+        result.num_rows = 0
+        return result
 
     class_collection.find.side_effect = mock_find
-
-    # Setup captured data for upserting
-    upserted_data = []
-
-    def capture_upsert(data, filter_fields, update_fields=None):
-        nonlocal upserted_data
-        if data and isinstance(data, list):
-            upserted_data.extend(data)
-
-    class_collection.upsert.side_effect = capture_upsert
-
-    # Configure relation collection delete method
     relation_collection.delete = MagicMock()
 
-    # Run the upsert function
     loader.upsert_ontology_data(mock_obsolete_classes, mock_ontology_relations)
 
-    # Verify obsolete terms were handled
-    obsolete_terms = ["ONT:002", "ONT:003"]  # These are marked as obsolete in mock_obsolete_classes
+    obsolete_terms = ["ONT:002", "ONT:003"]
     relation_collection.delete.assert_any_call(
         {"$or": [{"subject": {"$in": obsolete_terms}}, {"object": {"$in": obsolete_terms}}]}
     )
-
-    # Verify class collection find was called for correct term lookups
-    # The _handle_obsolete_terms function should look up each obsolete term
     for term_id in obsolete_terms:
         class_collection.find.assert_any_call({"id": term_id})
+
+    # Class bulk-write went through pymongo with all three input classes.
+    py_class = loader._py_db["ontology_class_set"]
+    assert py_class.bulk_write.called
