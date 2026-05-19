@@ -8,6 +8,7 @@ import pystow
 from linkml_runtime.dumpers import json_dumper
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from oaklib import get_adapter
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -121,13 +122,21 @@ class OntologyProcessor:
         ontology_prefix = self.ontology.upper() + ":"
 
         # Process non-obsolete entities
-        for entity in self.adapter.entities(filter_obsoletes=True):
+        for entity in tqdm(
+            self.adapter.entities(filter_obsoletes=True),
+            desc=f"Extracting {self.ontology} classes (non-obsolete)",
+            unit="entity",
+        ):
             if entity.startswith(ontology_prefix):
                 ontology_class = self._create_ontology_class(entity, is_obsolete=False)
                 ontology_classes.append(ontology_class)
 
         # Process obsolete entities
-        for obsolete_entity in self.adapter.obsoletes():
+        for obsolete_entity in tqdm(
+            self.adapter.obsoletes(),
+            desc=f"Extracting {self.ontology} classes (obsolete)",
+            unit="entity",
+        ):
             if obsolete_entity.startswith(ontology_prefix):
                 ontology_class = self._create_ontology_class(obsolete_entity, is_obsolete=True)
                 ontology_classes.append(ontology_class)
@@ -172,7 +181,11 @@ class OntologyProcessor:
         logger.info("Processing ancestry relationships...")
         ancestry_count = 0
 
-        for entity in relevant_entities:
+        for entity in tqdm(
+            relevant_entities,
+            desc=f"Computing {self.ontology} ancestry closure",
+            unit="entity",
+        ):
             # Get ancestors for this entity and filter to only include those from our ontology
             ancestors = set(
                 ancestor
