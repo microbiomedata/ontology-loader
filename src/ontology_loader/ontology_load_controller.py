@@ -28,6 +28,7 @@ class OntologyLoaderController:
         generate_reports: bool = True,
         mongo_client=None,
         db_name: str = None,
+        force_refresh: bool = True,
     ):
         """
         Set the parameters for the OntologyLoader.
@@ -38,6 +39,8 @@ class OntologyLoaderController:
             generate_reports: Whether to generate reports (default: True)
             mongo_client: Optional existing MongoDB client to use instead of creating a new connection
             db_name: Database name to use with existing client (required when mongo_client is provided)
+            force_refresh: If True (default), wipe any cached pystow artifact for this ontology
+                and re-download from S3. Set False to reuse an existing cached download.
 
         """
         self.source_ontology = source_ontology
@@ -45,6 +48,7 @@ class OntologyLoaderController:
         self.generate_reports = generate_reports
         self.mongo_client = mongo_client
         self.db_name = db_name
+        self.force_refresh = force_refresh
 
         # Validate that db_name is provided when mongo_client is provided
         if self.mongo_client and not self.db_name:
@@ -55,7 +59,7 @@ class OntologyLoaderController:
         # Load Schema View
         nmdc_sv = load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
         # Initialize the Ontology Processor
-        processor = OntologyProcessor(self.source_ontology)
+        processor = OntologyProcessor(self.source_ontology, force_refresh=self.force_refresh)
 
         # Process ontology terms and return a list of OntologyClass dicts produced by linkml json dumper as dict
         ontology_classes = processor.get_terms_and_metadata()

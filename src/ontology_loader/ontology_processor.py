@@ -42,14 +42,20 @@ class OntologyProcessor:
 
     """Ontology Processor class to process ontology terms and relations."""
 
-    def __init__(self, ontology: str):
+    def __init__(self, ontology: str, force_refresh: bool = True):
         """
         Initialize the OntologyProcessor with a given SQLite ontology.
 
         :param ontology: The ontology prefix (e.g., "envo", "go", "uberon", etc.)
+        :param force_refresh: If True (default), remove any cached pystow
+            directory for this ontology and re-download the semsql sqlite
+            artifact from S3. Set to False to reuse a previously-downloaded
+            artifact (e.g. for fast local iteration); the download/extract
+            steps then become no-ops when the files already exist.
 
         """
         self.ontology = ontology
+        self.force_refresh = force_refresh
         self.ontology_db_path = self.download_and_prepare_ontology()
         self.adapter = get_adapter(f"sqlite:{self.ontology_db_path}")
         self.adapter.precompute_lookups()  # Optimize lookups
@@ -64,10 +70,13 @@ class OntologyProcessor:
         # Get the ontology-specific pystow directory
         source_ontology_module = pystow.module(self.ontology).base  # Example: ~/.pystow/envo
 
-        # If the directory exists, remove it and all its contents
-        if source_ontology_module.exists():
+        # Force-refresh wipes any cached artifact so pystow re-downloads.
+        # When False, an existing .db.gz / .db is reused as-is (no network).
+        if self.force_refresh and source_ontology_module.exists():
             logger.info(f"Removing existing pystow directory for {self.ontology}: {source_ontology_module}")
             shutil.rmtree(source_ontology_module)
+        elif source_ontology_module.exists():
+            logger.info(f"Reusing cached pystow directory for {self.ontology}: {source_ontology_module}")
 
         # Define ontology URL
         ontology_db_url_prefix = "https://s3.amazonaws.com/bbop-sqlite/"
