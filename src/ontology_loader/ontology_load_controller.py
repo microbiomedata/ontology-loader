@@ -83,7 +83,7 @@ class OntologyLoaderController:
 
         # Update data
         updates_report, insertions_report, insert_relations_report = db_manager.upsert_ontology_data(
-            ontology_classes_relations, ontology_relations
+            ontology_classes_relations, ontology_relations, report_mode=self.report_mode
         )
 
         # Optionally write job reports
