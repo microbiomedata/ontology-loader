@@ -22,6 +22,7 @@ motor = "^3.6.0"
 pystow = "^0.5.0"
 tox = "^4.24.1"
 pytest = "^8.3.4"
+pytest-cov = "^7.1.0"
 mongomock = "^4.3.0"
 
 [tool.poetry.group.dev.dependencies]
@@ -85,6 +86,30 @@ skip = "*.po,*.ts,.git,pyproject.toml"
 count = ""
 quiet-level = 3
 # ignore-words-list = ""
+
+[tool.pytest.ini_options]
+# pytest-cov plugin: auto-enable coverage on every `pytest` invocation
+# (including `make test` and tox). Threshold + reporting are configured
+# under `[tool.coverage.*]` below.
+addopts = "--cov=ontology_loader --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["ontology_loader"]
+omit = [
+    "*/tests/*",
+]
+
+[tool.coverage.report]
+# Starting threshold picked from the measured baseline on this branch
+# (80% of `src/ontology_loader/` statements). The intent is to lock in
+# today's coverage as a floor; ratchet up as new tests land.
+fail_under = 80
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
