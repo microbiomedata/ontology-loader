@@ -187,10 +187,7 @@ class MongoDBLoader:
         else:
             # Create a new connection using the connection string
             self.handle = get_mongo_connection_string(self.db_config)
-            logger.info(
-                f"Connecting to mongodb://{self.db_config.db_host}:{self.db_config.db_port}"
-                f"/{self.db_config.db_name}"
-            )
+            logger.info(f"Connecting to mongodb://{self.db_config.db_host}:{self.db_config.db_port}/{self.db_config.db_name}")
             self.client = Client(handle=self.handle)
             self.db = self.client.attach_database(handle=self.handle)
 
