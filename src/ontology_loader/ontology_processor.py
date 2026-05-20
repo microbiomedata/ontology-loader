@@ -50,6 +50,9 @@ class OntologyProcessor:
 
         """
         self.ontology = ontology
+        # Cache the lowercased ontology name once; `_matches_ontology` is called
+        # in hot loops over millions of entities/ancestors at NCBITaxon scale.
+        self._ontology_lc = ontology.lower()
         self.ontology_db_path = self.download_and_prepare_ontology()
         self.adapter = get_adapter(f"sqlite:{self.ontology_db_path}")
         self.adapter.precompute_lookups()  # Optimize lookups
@@ -118,7 +121,7 @@ class OntologyProcessor:
     def _matches_ontology(self, entity_id: str) -> bool:
         """Case-insensitive check that ``entity_id`` is a CURIE in this ontology."""
         head, sep, _ = entity_id.partition(":")
-        return bool(sep) and head.lower() == self.ontology.lower()
+        return bool(sep) and head.lower() == self._ontology_lc
 
     def get_terms_and_metadata(self):
         """Retrieve all terms that belong to this ontology and return a list of OntologyClass objects."""
