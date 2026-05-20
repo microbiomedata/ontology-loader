@@ -50,7 +50,9 @@ style = "pep440"
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+# Match the project's minimum supported Python (declared above as `python = "^3.10"`).
+# A higher target-version would let Ruff allow/format 3.11+-only syntax that won't run on 3.10.
+target-version = "py310"
 
 [tool.ruff.lint]
 extend-ignore = [
