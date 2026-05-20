@@ -72,7 +72,6 @@ def test_cli_unknown_option_rejected():
 
 
 class _FakeOntologyProcessor:
-
     """
     Minimal stand-in for `OntologyProcessor`.
 
