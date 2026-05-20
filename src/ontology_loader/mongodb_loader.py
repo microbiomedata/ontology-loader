@@ -216,6 +216,8 @@ class MongoDBLoader:
         relation_collection = self.db.create_collection(relation_collection_name, recreate_if_exists=False)
 
         class_collection.index("id", unique=False, name="ontology_class_index")
+        class_collection.index("is_obsolete", unique=False, name="ontology_class_is_obsolete_index")
+        class_collection.index("name", unique=False, name="ontology_class_name_index")
         relation_collection.index(["subject", "predicate", "object"], unique=False, name="ontology_relation_index")
 
         # Step 1: Upsert ontology terms
