@@ -23,6 +23,7 @@ pystow = "^0.5.0"
 tox = "^4.24.1"
 pytest = "^8.3.4"
 mongomock = "^4.3.0"
+setuptools = "<80"
 
 [tool.poetry.group.dev.dependencies]
 pytest = {version = ">=7.1.2"}
