@@ -205,15 +205,11 @@ class OntologyProcessor:
                 for closure_name, closure_predicates in closure_specs:
                     ancestors = set(
                         ancestor
-                        for ancestor in self.adapter.ancestors(
-                            entity, reflexive=True, predicates=closure_predicates
-                        )
+                        for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=closure_predicates)
                         if ancestor.startswith(ontology_prefix)
                     )
                     for ancestor in ancestors:
-                        relation_dict = _create_relation(
-                            entity, closure_name, ancestor, ontology_terms_dict
-                        )
+                        relation_dict = _create_relation(entity, closure_name, ancestor, ontology_terms_dict)
                         ontology_relations.append(relation_dict)
                         ancestry_count += 1
             logger.info(f"Processed {ancestry_count} ancestry relationships")
