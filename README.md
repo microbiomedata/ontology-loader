@@ -139,7 +139,8 @@ export MONGO_HOST=localhost
 export MONGO_PORT=27017            # or whatever your local Mongo listens on
 export MONGO_USERNAME=admin
 export MONGO_PASSWORD="your_valid_password"
-export MONGO_DBNAME=nmdc           # used by tests that read it; the smoke E2E uses its own scratch db
+export MONGO_DB=nmdc               # read by the loader (see src/ontology_loader/mongo_db_config.py)
+export MONGO_DBNAME=nmdc           # read by tests/test_ontology_class_null_values.py — currently a separate name from MONGO_DB
 export ENABLE_DB_TESTS=true        # required by tests/test_ontology_load_controller.py
 ```
 
@@ -149,7 +150,12 @@ Then:
 make test
 ```
 
-Same command runs without the env vars; the DB-gated tests just skip. Mock-only tests still run either way. This is intended both to prevent accidental writes against a live database when env vars aren't deliberately set, and to make sure `MONGO_PASSWORD` is never hardcoded in the codebase. CI (the GitHub Actions workflow) sets the env vars and spins up a containerized MongoDB so the gated tests actually run there.
+Same command runs without the env vars; the DB-gated tests just skip. Mock-only tests still run either way. This is intended both to prevent accidental writes against a live database when env vars aren't deliberately set, and to make sure `MONGO_PASSWORD` is never hardcoded in the codebase.
+
+> **Known inconsistencies (separate PRs in flight):**
+>
+> - `tests/test_linkml_store_client_connections.py` still hardcodes `MONGO_PORT = 27022` (and host / user / db). PR #23 makes it read from env vars to match the rest of the suite.
+> - GitHub Actions CI doesn't yet spin up a MongoDB service; the DB-gated tests skip in CI. PR #39 adds a `services: mongo:` block and sets the env vars on the test step.
 
 #### Safety rules for DB-writing tests
 

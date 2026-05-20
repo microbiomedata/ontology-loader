@@ -8,10 +8,11 @@ These tests verify high-level plumbing rather than algorithm correctness:
   flagged on PR #21 where a stored attribute wasn't passed through to
   the underlying loader call).
 - An unknown flag is rejected with a non-zero exit code.
-- The controller runs end-to-end against an in-memory `mongomock` client
-  (already a declared dependency) using a stubbed `OntologyProcessor`,
-  so no semsql download or real MongoDB is required. Verifies that
-  classes and relations land in the expected collections.
+- The controller runs end-to-end against a live MongoDB (skips when
+  `MONGO_PASSWORD` isn't set) using a stubbed `OntologyProcessor`, so no
+  semsql download is required. A `mongomock` variant was attempted but
+  mongomock's strict `create_index` handling conflicts with linkml_store's
+  repeated `index()` calls during `upsert_ontology_data`.
 """
 
 from __future__ import annotations
