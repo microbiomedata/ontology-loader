@@ -1,4 +1,5 @@
-"""Smoke tests for the ontology_loader CLI and end-to-end controller path.
+"""
+Smoke tests for the ontology_loader CLI and end-to-end controller path.
 
 These tests verify high-level plumbing rather than algorithm correctness:
 
@@ -25,7 +26,6 @@ from nmdc_schema.nmdc import OntologyClass
 from pymongo import MongoClient
 
 from ontology_loader.ontology_load_controller import OntologyLoaderController
-
 
 # Flags the CLI must advertise. Update this set when a new --foo option is
 # wired into `cli.py`. Tests fail loudly if a flag's @click.option is added
@@ -63,13 +63,15 @@ def test_cli_unknown_option_rejected():
     assert result.returncode != 0
     combined = (result.stdout + result.stderr).lower()
     # Click error message format: "Error: No such option: --this-flag-does-not-exist"
-    assert "no such option" in combined or "this-flag-does-not-exist" in combined, (
-        f"expected Click error referencing the unknown option; got:\n{result.stdout + result.stderr}"
-    )
+    assert (
+        "no such option" in combined or "this-flag-does-not-exist" in combined
+    ), f"expected Click error referencing the unknown option; got:\n{result.stdout + result.stderr}"
 
 
 class _FakeOntologyProcessor:
-    """Minimal stand-in for `OntologyProcessor`.
+
+    """
+    Minimal stand-in for `OntologyProcessor`.
 
     Returns canned class and relation lists. Avoids the heavy real `__init__`,
     which downloads a semsql sqlite from S3 and opens it with oaklib.
@@ -115,7 +117,8 @@ class _FakeOntologyProcessor:
     reason="Skipping test: requires a live MongoDB (set MONGO_PASSWORD and other MONGO_* env vars)",
 )
 def test_controller_end_to_end_against_live_mongo(tmp_path):
-    """OntologyLoaderController runs end-to-end against a real MongoDB and lands documents.
+    """
+    OntologyLoaderController runs end-to-end against a real MongoDB and lands documents.
 
     Uses a stubbed `OntologyProcessor` so the test doesn't need a real semsql
     sqlite (would require a multi-minute download). Real MongoDB is required
