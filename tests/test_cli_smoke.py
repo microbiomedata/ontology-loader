@@ -103,7 +103,10 @@ class _FakeOntologyProcessor:
             ),
         ]
 
-    def get_relations_closure(self, predicates=None, ontology_terms=None):
+    def get_relations_closure(self, predicates=None, ontology_terms=None, **kwargs):
+        # Accept and ignore any extra keyword arguments (e.g. closure-emission
+        # flags) so the fake stays forward-compatible with future call-site
+        # additions on the integration branch.
         relations = [
             {
                 "subject": "TEST:002",
