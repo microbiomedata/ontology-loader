@@ -22,13 +22,13 @@ motor = "^3.6.0"
 pystow = "^0.5.0"
 tox = "^4.24.1"
 pytest = "^8.3.4"
+pytest-cov = "^7.1.0"
 mongomock = "^4.3.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = {version = ">=7.1.2"}
 tox = {version = ">=3.25.1"}
 pre-commit = {version = ">=3.3.3"}
-pytest-cov = "^7.1.0"
 
 [tool.poetry.group.docs]
 optional = true
