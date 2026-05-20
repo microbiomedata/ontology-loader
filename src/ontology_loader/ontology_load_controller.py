@@ -2,6 +2,7 @@
 
 import logging
 import tempfile
+import warnings
 
 from ontology_loader.mongodb_loader import MongoDBLoader
 from ontology_loader.ontology_processor import OntologyProcessor
@@ -10,6 +11,9 @@ from ontology_loader.utils import load_yaml_from_package
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+
+_GENERATE_REPORTS_UNSET = object()
 
 
 class OntologyLoaderController:
@@ -25,7 +29,7 @@ class OntologyLoaderController:
         self,
         source_ontology: str = "envo",
         output_directory: str = tempfile.gettempdir(),
-        generate_reports: bool = True,
+        generate_reports=_GENERATE_REPORTS_UNSET,
         mongo_client=None,
         db_name: str = None,
         report_mode: str = "compared",
@@ -36,19 +40,47 @@ class OntologyLoaderController:
         Args:
             source_ontology: Name of the ontology to load (default: "envo")
             output_directory: Directory where reports will be written (default: temp directory)
-            generate_reports: Whether to generate reports (default: True)
+            generate_reports: DEPRECATED. Use ``report_mode`` instead. ``generate_reports=False``
+                (without an explicit ``report_mode``) is translated to ``report_mode="off"`` and
+                emits ``DeprecationWarning``. To be removed in a future release; see #36.
             mongo_client: Optional existing MongoDB client to use instead of creating a new connection
             db_name: Database name to use with existing client (required when mongo_client is provided)
             report_mode: 'compared' (default; preserves no-change skip), 'upsert' (max throughput),
-                or 'off' (no report tracking). See `MongoDBLoader.upsert_ontology_data`.
+                or 'off' (skip both in-memory tracking and TSV writes). See
+                ``MongoDBLoader.upsert_ontology_data``.
 
         """
         self.source_ontology = source_ontology
         self.output_directory = output_directory
-        self.generate_reports = generate_reports
         self.mongo_client = mongo_client
         self.db_name = db_name
         self.report_mode = report_mode
+
+        if generate_reports is not _GENERATE_REPORTS_UNSET:
+            if generate_reports is False:
+                if report_mode == "compared":
+                    warnings.warn(
+                        "OntologyLoaderController(generate_reports=False) is deprecated; "
+                        "pass report_mode='off' instead. Treating this run as report_mode='off'.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                    self.report_mode = "off"
+                else:
+                    warnings.warn(
+                        f"OntologyLoaderController(generate_reports=False) is deprecated; "
+                        f"the explicit report_mode={report_mode!r} takes precedence. "
+                        "Drop generate_reports from the call.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+            else:
+                warnings.warn(
+                    "OntologyLoaderController(generate_reports=...) is deprecated and ignored when True; "
+                    "use report_mode to control reporting behavior.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
 
         # Validate that db_name is provided when mongo_client is provided
         if self.mongo_client and not self.db_name:
@@ -86,8 +118,8 @@ class OntologyLoaderController:
             ontology_classes_relations, ontology_relations, report_mode=self.report_mode
         )
 
-        # Optionally write job reports
-        if self.generate_reports:
+        # Optionally write job reports — skipped entirely when reporting is off.
+        if self.report_mode != "off":
             ReportWriter.write_reports(
                 reports=[updates_report, insertions_report, insert_relations_report],
                 output_format="tsv",

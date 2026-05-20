@@ -32,7 +32,6 @@ def ontology_loader():
     return OntologyLoaderController(
         source_ontology="envo",
         output_directory=tempfile.gettempdir(),
-        generate_reports=True,
     )
 
 
@@ -57,7 +56,6 @@ def ontology_loader_with_client(mock_mongo_client):
     return OntologyLoaderController(
         source_ontology="envo",
         output_directory=tempfile.gettempdir(),
-        generate_reports=True,
         mongo_client=mock_mongo_client,
         db_name="test_db",
     )
