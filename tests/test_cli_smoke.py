@@ -40,7 +40,10 @@ EXPECTED_FLAGS = {
 
 def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     """Invoke the CLI as a subprocess and return the completed process."""
-    return subprocess.run(
+    # S603 is bandit's "untrusted input to subprocess" warning. All args are
+    # under test control (sys.executable + a hardcoded module path + test
+    # literals), so the warning doesn't apply here.
+    return subprocess.run(  # noqa: S603
         [sys.executable, "-m", "ontology_loader.cli", *args],
         capture_output=True,
         text=True,
