@@ -7,6 +7,7 @@ from typing import List, Optional
 from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+from tqdm import tqdm
 
 from ontology_loader.mongo_db_config import MongoDBConfig
 from ontology_loader.reporter import Report
@@ -187,7 +188,7 @@ class MongoDBLoader:
         else:
             # Create a new connection using the connection string
             self.handle = get_mongo_connection_string(self.db_config)
-            logger.info(f"MongoDB connection string: {self.handle}")
+            logger.info(f"Connecting to mongodb://{self.db_config.db_host}:{self.db_config.db_port}/{self.db_config.db_name}")
             self.client = Client(handle=self.handle)
             self.db = self.client.attach_database(handle=self.handle)
 
@@ -229,7 +230,7 @@ class MongoDBLoader:
         _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection)
 
         # Step 1.2: Upsert ontology classes
-        for obj in ontology_classes:
+        for obj in tqdm(ontology_classes, desc="Upserting ontology classes", unit="class"):
             was_updated, report_row = _upsert_ontology_class(obj, class_collection, ontology_fields)
             if was_updated and report_row:
                 updates_report.append(report_row)
@@ -237,7 +238,7 @@ class MongoDBLoader:
                 insertions_report.append(report_row)
 
         # Step 2: Upsert relations
-        for relation in ontology_relations:
+        for relation in tqdm(ontology_relations, desc="Upserting ontology relations", unit="rel"):
             report_data = _upsert_relation(relation, relation_collection)
             if report_data:
                 insertions_report_relations.append(report_data)
