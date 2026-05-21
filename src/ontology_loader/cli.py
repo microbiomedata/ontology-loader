@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--report-directory",
     default=None,
-    help=("Directory for TSV reports (only used when --mode=meticulous). " "Defaults to a fresh temp directory."),
+    help=("Directory for TSV reports (only used when --mode=meticulous). " "Defaults to the system temp directory."),
 )
 @click.option(
     "--mode",
