@@ -3,6 +3,29 @@
 Suite of tools to configure and load an ontology from the OboFoundary into the data object for OntologyClass as 
 specified by NMDC schema.
 
+## Architecture: MongoDB access patterns
+
+`MongoDBLoader` reaches MongoDB through two paths simultaneously — a deliberate hybrid, not an oversight.
+
+**linkml-store (the "dog food" path).** Used for schema-aware setup and for any path where per-document work is acceptable:
+
+- `Client(handle=...)` / `attach_database(...)` — declarative connection that integrates with NMDC's LinkML schema tooling.
+- `db.create_collection(name, recreate_if_exists=False)` — idempotent collection setup.
+- `collection.index(...)` — idempotent index declaration on `id`, `is_obsolete`, `name` (class collection) and `(subject, predicate, object)` (relation collection).
+- `_handle_obsolete_terms` — per-item processing of the small obsolete subset.
+
+**Raw pymongo (the hot-path bypass).** Used only for the bulk-upsert phase, exposed via the lazy `MongoDBLoader._py_db` property:
+
+- `py_collection.bulk_write([UpdateOne(...upsert=True), ...], ordered=False)` in batches of 1,000 — turns 2N round trips per N documents into roughly 2 per 1,000.
+
+### Why both?
+
+`linkml_store.api.stores.mongodb.mongodb_collection.upsert` (as of the version pinned here) iterates per-item with `find_one` followed by `update_one`/`insert_one`. For ENVO/UBERON/PO that's fine. For NCBITaxon (~2.7M classes + ~55M closure relations) it's prohibitive — measured at ~1,000 ops/sec, extrapolating to tens of hours of wall time. The raw-pymongo bulk path measured **~15× faster on average** with peaks ~32× faster, completing the same NCBITaxon load in ~62 minutes instead.
+
+The pymongo path is a *bypass*, not a permanent split. Upstream issue [`linkml/linkml-store#77`](https://github.com/linkml/linkml-store/issues/77) tracks adding `bulk_write` support to linkml-store. When that lands, the bypass becomes redundant and the loader should migrate back to a single linkml-store-only code path.
+
+The bypass is gated behind the lazy `MongoDBLoader._py_db` property so existing-client paths (e.g., a Dagster job passing in its own `MongoClient`) reuse the supplied client rather than opening a separate connection. The property's docstring re-states this rationale in code.
+
 ## Development Environment
 
 #### Pre-requisites
