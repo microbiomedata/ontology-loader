@@ -8,6 +8,7 @@ import pystow
 from linkml_runtime.dumpers import json_dumper
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from oaklib import get_adapter
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -154,13 +155,21 @@ class OntologyProcessor:
         ontology_classes = []
 
         # Process non-obsolete entities
-        for entity in self.adapter.entities(filter_obsoletes=True):
+        for entity in tqdm(
+            self.adapter.entities(filter_obsoletes=True),
+            desc=f"Extracting {self.ontology} classes (non-obsolete)",
+            unit="entity",
+        ):
             if self._matches_ontology(entity):
                 ontology_class = self._create_ontology_class(entity, is_obsolete=False)
                 ontology_classes.append(ontology_class)
 
         # Process obsolete entities
-        for obsolete_entity in self.adapter.obsoletes():
+        for obsolete_entity in tqdm(
+            self.adapter.obsoletes(),
+            desc=f"Extracting {self.ontology} classes (obsolete)",
+            unit="entity",
+        ):
             if self._matches_ontology(obsolete_entity):
                 ontology_class = self._create_ontology_class(obsolete_entity, is_obsolete=True)
                 ontology_classes.append(ontology_class)
@@ -231,7 +240,11 @@ class OntologyProcessor:
             )
             ancestry_count = 0
             for preds, closure_predicate_name in ancestry_specs:
-                for entity in relevant_entities:
+                for entity in tqdm(
+                    relevant_entities,
+                    desc=f"Computing {self.ontology} ancestry closure ({closure_predicate_name})",
+                    unit="entity",
+                ):
                     ancestors = set(
                         ancestor
                         for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=preds)
