@@ -54,12 +54,35 @@ The Docker container networking uses container names (like 'mongo') for internal
 ``` 
 
 #### Command line
+
 ```bash
 % poetry install
 % poetry run ontology_loader --help
-% poetry run ontology_loader --source-ontology "envo"
-% poetry run ontology_loader --source-ontology "uberon"
+% poetry run ontology_loader --source-ontology envo
+% poetry run ontology_loader --source-ontology envo --source-ontology po --source-ontology uberon
 ```
+
+Four flags:
+
+- `--source-ontology <name>` — required, repeatable. Lowercase prefix (envo, po, uberon, ncbitaxon, …). Multiple ontologies are processed sequentially in the given order.
+- `--report-directory <dir>` — TSV report destination (only used in `meticulous` mode). Defaults to a fresh temp directory.
+- `--mode {meticulous|fast-initial}` — default `meticulous`. See "Modes" below.
+- `--closure {combined|isa|partof|all|none}` — default `combined`. Repeatable; values combine. `all` and `none` are exclusive.
+
+##### Modes
+
+- **`meticulous`** (default): Preserves 0.2.x behavior — pure linkml-store, per-item upsert, force-refresh of the pystow cache on every run, TSV reports (`ontology_updates.tsv`, `ontology_inserts.tsv`, `ontology_relation_inserts.tsv`) written to `--report-directory`. Use this for incremental updates of an already-loaded ontology.
+- **`fast-initial`**: Maximum-throughput first-time install. Raw pymongo `insert_many(ordered=False)`, no upsert, no pre-read, no report tracking, no TSV writes. Reuses the pystow cache if present (downloads only when missing). Use this when the target collections are empty or duplicate-key errors are acceptable. Expected ~3-5x faster than `meticulous` on large ontologies (e.g. NCBITaxon's 2.7M classes + 54.7M relations).
+
+##### Closure shorthands
+
+- `--closure combined` (default): emits `entailed_isa_partof_closure` (rdfs:subClassOf ∪ BFO:0000050).
+- `--closure isa`: emits `entailed_isa_closure` (rdfs:subClassOf only).
+- `--closure partof`: emits `entailed_partof_closure` (BFO:0000050 only).
+- `--closure all`: shorthand for `--closure combined --closure isa --closure partof`. Exclusive.
+- `--closure none`: emit no ancestry closure, only direct relationships. Exclusive.
+
+Repeat the flag to combine specific closures: `--closure isa --closure partof` emits both `entailed_isa_closure` and `entailed_partof_closure`.
 
 #### Running the tests
 ```bash
@@ -71,7 +94,8 @@ The Docker container networking uses container names (like 'mongo') for internal
 % make lint
 ```
 
-#### Python example usage
+#### Python API
+
 ```bash
 pip install nmdc-ontology-loader
 ```
@@ -80,48 +104,68 @@ pip install nmdc-ontology-loader
 from ontology_loader.ontology_load_controller import OntologyLoaderController
 import tempfile
 
-def load_ontology():
-    """Load an ontology using the default MongoDB connection."""
-    loader = OntologyLoaderController(
-        source_ontology="envo",
-        output_directory=tempfile.gettempdir(),
-        generate_reports=True,
-    )
-    loader.run_ontology_loader()
+# Default: pure linkml-store + TSV reports (preserves 0.2.x behavior)
+OntologyLoaderController(
+    source_ontology="envo",                          # str or list[str]
+    report_directory=tempfile.gettempdir(),          # only used in 'meticulous' mode
+    mode="meticulous",                               # or 'fast-initial'
+    closure="combined",                              # str or list[str]
+).run_ontology_loader()
 ```
 
-#### Using with an existing MongoDB connection
+##### Fast first-time install of a large ontology
 
-If you already have a MongoDB connection established (e.g., in a Dagster/Dagit job), you can pass it directly to the OntologyLoaderController:
+```python
+OntologyLoaderController(
+    source_ontology="ncbitaxon",
+    mode="fast-initial",        # raw pymongo insert_many, no upsert, no reports
+    closure="isa",              # is_a only; combined closure is too large for NCBITaxon
+).run_ontology_loader()
+```
+
+##### Multiple ontologies in one invocation
+
+```python
+OntologyLoaderController(
+    source_ontology=["envo", "po", "uberon"],   # processed sequentially in given order
+    mode="meticulous",
+).run_ontology_loader()
+```
+
+##### Using with an existing MongoDB connection
+
+If you already have a MongoDB connection (e.g., in a Dagster/Dagit job), pass it directly:
 
 ```python
 from pymongo import MongoClient
 from ontology_loader.ontology_load_controller import OntologyLoaderController
-import tempfile
 
-# Use an existing MongoDB client
 mongo_client = MongoClient("mongodb://admin:password@localhost:27018/nmdc?authSource=admin")
 
-# Pass the client and database name to OntologyLoaderController
-loader = OntologyLoaderController(
+OntologyLoaderController(
     source_ontology="envo",
-    output_directory=tempfile.gettempdir(),
-    generate_reports=True,
-    mongo_client=mongo_client,  # Pass the existing client
-    db_name="nmdc",  # Required when passing an existing client
-)
-
-# The loader will use the provided client instead of creating a new connection
-loader.run_ontology_loader()
+    mode="meticulous",
+    mongo_client=mongo_client,   # Pass the existing client
+    db_name="nmdc",              # Required when passing an existing client
+).run_ontology_loader()
 ```
 
-This approach is particularly useful when:
-- You're running in a job scheduler like Dagster/Dagit
-- You want to reuse an existing connection pool
-- You have custom MongoDB connection settings that are managed externally
-- You need to use a connection with specific authentication or configuration
+> **Note**: When passing an existing MongoDB client, you must also provide `db_name`. The database name cannot be auto-determined from a MongoClient instance.
 
-> **Note**: When passing an existing MongoDB client, you must also provide the `db_name` parameter to specify which database to use. This is required as the database name cannot be automatically determined from a MongoDB client instance.
+#### Migrating from 0.2.x
+
+The 0.2.x constructor signature (`source_ontology`, `output_directory`, `generate_reports`, `mongo_client`, `db_name`) continues to work as deprecated aliases. The exact call site in nmdc-runtime's Dagster `load_ontology` op runs unchanged under 0.3.0; two `DeprecationWarning` lines appear in the logs as a nudge.
+
+| old kwarg | new kwarg | behavior |
+|---|---|---|
+| `source_ontology=<str>` | `source_ontology=<str \| list[str]>` | unchanged; now also accepts a list |
+| `output_directory=<str>` | `report_directory=<str>` | renamed; old kwarg works as alias with `DeprecationWarning`. Passing both raises. |
+| `generate_reports=True` | (gone — implicit) | no-op with `DeprecationWarning` (True was always the default) |
+| `generate_reports=False` | `mode='fast-initial'` | mapped with `DeprecationWarning`. If `mode` was also passed and isn't `'meticulous'`, raises. |
+| (none) | `mode='meticulous'` (default) | new; default preserves 0.2.x write path |
+| (none) | `closure='combined'` (default) | new; default preserves 0.2.x ancestry behavior |
+
+See `CHANGELOG.md` for the full release note and a side-by-side migration code sample.
 
 ### Testing CRUD operations in a live MongoDB
 

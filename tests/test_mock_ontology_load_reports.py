@@ -49,8 +49,7 @@ def ontology_loader():
     """
     return OntologyLoaderController(
         source_ontology="envo",
-        output_directory=tempfile.gettempdir(),
-        generate_reports=True,
+        report_directory=tempfile.gettempdir(),
     )
 
 
