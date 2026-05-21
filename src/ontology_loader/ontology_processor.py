@@ -71,6 +71,9 @@ class OntologyProcessor:
         """
         self.ontology = ontology
         self.force_refresh = force_refresh
+        # Cache the lowercased ontology name once; `_matches_ontology` is called
+        # in hot loops over millions of entities/ancestors at NCBITaxon scale.
+        self._ontology_lc = ontology.lower()
         self.ontology_db_path = self.download_and_prepare_ontology()
         self.adapter = get_adapter(f"sqlite:{self.ontology_db_path}")
         self.adapter.precompute_lookups()  # Optimize lookups
@@ -141,20 +144,24 @@ class OntologyProcessor:
 
         return ontology_class
 
+    def _matches_ontology(self, entity_id: str) -> bool:
+        """Case-insensitive check that ``entity_id`` is a CURIE in this ontology."""
+        head, sep, _ = entity_id.partition(":")
+        return bool(sep) and head.lower() == self._ontology_lc
+
     def get_terms_and_metadata(self):
-        """Retrieve all terms that start with the ontology prefix and return a list of OntologyClass objects."""
+        """Retrieve all terms that belong to this ontology and return a list of OntologyClass objects."""
         ontology_classes = []
-        ontology_prefix = self.ontology.upper() + ":"
 
         # Process non-obsolete entities
         for entity in self.adapter.entities(filter_obsoletes=True):
-            if entity.startswith(ontology_prefix):
+            if self._matches_ontology(entity):
                 ontology_class = self._create_ontology_class(entity, is_obsolete=False)
                 ontology_classes.append(ontology_class)
 
         # Process obsolete entities
         for obsolete_entity in self.adapter.obsoletes():
-            if obsolete_entity.startswith(ontology_prefix):
+            if self._matches_ontology(obsolete_entity):
                 ontology_class = self._create_ontology_class(obsolete_entity, is_obsolete=True)
                 ontology_classes.append(ontology_class)
 
@@ -191,7 +198,6 @@ class OntologyProcessor:
                 ancestry_specs.append((preds, name))
             direct_predicates = list(direct_predicates_set)
 
-        ontology_prefix = self.ontology.upper() + ":"
         ontology_relations = []
 
         # Create dictionary for fast lookup of ontology terms
@@ -199,7 +205,7 @@ class OntologyProcessor:
 
         # Get all relevant entities in one pass
         logger.info("Collecting relevant entities...")
-        relevant_entities = set(entity for entity in self.adapter.entities() if entity.startswith(ontology_prefix))
+        relevant_entities = set(entity for entity in self.adapter.entities() if self._matches_ontology(entity))
         logger.info(f"Found {len(relevant_entities)} relevant entities")
 
         # Process all direct relationships in one batch
@@ -229,7 +235,7 @@ class OntologyProcessor:
                     ancestors = set(
                         ancestor
                         for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=preds)
-                        if ancestor.startswith(ontology_prefix)
+                        if self._matches_ontology(ancestor)
                     )
                     for ancestor in ancestors:
                         relation_dict = _create_relation(entity, closure_predicate_name, ancestor, ontology_terms_dict)
