@@ -13,6 +13,24 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+# Map of closure values to (predicate list, closure relation name).
+# `None` means "no ancestry closure; emit only direct relationships."
+# `all` and `none` are convenience values handled in `_normalize_closure_spec`;
+# they don't appear here because they don't map to a single (predicates, name) pair.
+_CLOSURE_SPECS = {
+    "combined": (["rdfs:subClassOf", "BFO:0000050"], "entailed_isa_partof_closure"),
+    "isa": (["rdfs:subClassOf"], "entailed_isa_closure"),
+    "partof": (["BFO:0000050"], "entailed_partof_closure"),
+}
+
+# What `all` expands to. Kept in stable order so log output is deterministic.
+_ALL_CLOSURES = ("combined", "isa", "partof")
+
+# User-facing valid values. `all` and `none` are convenience aliases handled in
+# `_normalize_closure_spec`. Stable order matches the CLI choice list.
+VALID_CLOSURES = ("combined", "isa", "partof", "all", "none")
+
+
 def _create_relation(subject, predicate, obj, ontology_terms_dict):
     """
     Create an ontology relation and update related ontology terms.
@@ -42,14 +60,17 @@ class OntologyProcessor:
 
     """Ontology Processor class to process ontology terms and relations."""
 
-    def __init__(self, ontology: str):
+    def __init__(self, ontology: str, force_refresh: bool = True):
         """
         Initialize the OntologyProcessor with a given SQLite ontology.
 
         :param ontology: The ontology prefix (e.g., "envo", "go", "uberon", etc.)
-
+        :param force_refresh: If True (default, preserves 0.2.x behavior), wipe any cached pystow
+            directory for this ontology and re-download from S3. If False, reuse the cached
+            artifact when present; pystow.ensure() still downloads if the cache is empty.
         """
         self.ontology = ontology
+        self.force_refresh = force_refresh
         self.ontology_db_path = self.download_and_prepare_ontology()
         self.adapter = get_adapter(f"sqlite:{self.ontology_db_path}")
         self.adapter.precompute_lookups()  # Optimize lookups
@@ -64,17 +85,22 @@ class OntologyProcessor:
         # Get the ontology-specific pystow directory
         source_ontology_module = pystow.module(self.ontology).base  # Example: ~/.pystow/envo
 
-        # If the directory exists, remove it and all its contents
         if source_ontology_module.exists():
-            logger.info(f"Removing existing pystow directory for {self.ontology}: {source_ontology_module}")
-            shutil.rmtree(source_ontology_module)
+            if self.force_refresh:
+                logger.info(f"Removing existing pystow directory for {self.ontology}: {source_ontology_module}")
+                shutil.rmtree(source_ontology_module)
+            else:
+                logger.info(f"Reusing cached pystow directory for {self.ontology}: {source_ontology_module}")
 
         # Define ontology URL
         ontology_db_url_prefix = "https://s3.amazonaws.com/bbop-sqlite/"
         ontology_db_url_suffix = ".db.gz"
         ontology_url = ontology_db_url_prefix + self.ontology + ontology_db_url_suffix
 
-        # Define paths (download to the module-specific directory)
+        # Define paths (download to the module-specific directory).
+        # pystow.ensure() is a no-op if the file already exists at the expected path,
+        # so this is what handles the "reuse cache if present, download if missing"
+        # branch when force_refresh=False.
         compressed_path = pystow.ensure(self.ontology, f"{self.ontology}.db.gz", url=ontology_url)
         decompressed_path = compressed_path.with_suffix("")  # Remove .gz to get .db file
 
@@ -134,15 +160,37 @@ class OntologyProcessor:
 
         return ontology_classes
 
-    def get_relations_closure(self, predicates=None, ontology_terms: list = None) -> tuple:
+    def get_relations_closure(self, closure="combined", ontology_terms: list = None) -> tuple:
         """
-        Retrieve all ontology relations closure for terms with improved performance.
+        Retrieve ontology direct relations + ancestry closure for the configured ontology.
 
-        :param predicates: List of predicates to consider (default: ["rdfs:subClassOf", "BFO:0000050"])
-        :param ontology_terms: List of OntologyClass objects to consider (default: None)
-        :return: Tuple of (ontology_relations, updated_ontology_terms)
+        :param closure: A closure spec — either a single string or an iterable of strings drawn from
+            {'combined', 'isa', 'partof', 'none'}. Multiple values combine: e.g. ``['combined', 'isa']``
+            emits both ``entailed_isa_partof_closure`` and ``entailed_isa_closure``. ``'none'`` is
+            exclusive — passing it together with any other value raises ValueError.
+
+            - 'combined': rdfs:subClassOf + BFO:0000050 → entailed_isa_partof_closure (Sierra default)
+            - 'isa': rdfs:subClassOf → entailed_isa_closure
+            - 'partof': BFO:0000050 → entailed_partof_closure
+            - 'none': no ancestry closure; only direct relationships
+        :param ontology_terms: List of OntologyClass objects (default: None).
+        :return: Tuple of (ontology_relations, updated_ontology_terms).
         """
-        predicates = ["rdfs:subClassOf", "BFO:0000050"] if predicates is None else predicates
+        closures = _normalize_closure_spec(closure)
+        # Direct relationships: union of all predicates across the requested closures.
+        # For 'none' alone, fall back to the combined predicate set so direct relationships still emit.
+        if closures == ("none",):
+            direct_predicates = ["rdfs:subClassOf", "BFO:0000050"]
+            ancestry_specs = []
+        else:
+            direct_predicates_set: set[str] = set()
+            ancestry_specs = []
+            for c in closures:
+                preds, name = _CLOSURE_SPECS[c]
+                direct_predicates_set.update(preds)
+                ancestry_specs.append((preds, name))
+            direct_predicates = list(direct_predicates_set)
+
         ontology_prefix = self.ontology.upper() + ":"
         ontology_relations = []
 
@@ -157,7 +205,7 @@ class OntologyProcessor:
         # Process all direct relationships in one batch
         logger.info("Processing direct relationships...")
         relationship_count = 0
-        predicate_set = set(predicates)  # Convert to set for faster lookups
+        predicate_set = set(direct_predicates)
 
         # Get all relationships at once and filter as we process them
         for subject, predicate, obj in self.adapter.relationships():
@@ -168,26 +216,68 @@ class OntologyProcessor:
 
         logger.info(f"Processed {relationship_count} direct relationships")
 
-        # Process all ancestors for all entities in one batch
-        logger.info("Processing ancestry relationships...")
-        ancestry_count = 0
-
-        for entity in relevant_entities:
-            # Get ancestors for this entity and filter to only include those from our ontology
-            ancestors = set(
-                ancestor
-                for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=predicates)
-                if ancestor.startswith(ontology_prefix)
+        if not ancestry_specs:
+            logger.info("closure='none': skipping ancestry computation.")
+        else:
+            logger.info(
+                f"Processing ancestry relationships across {len(ancestry_specs)} closure type(s): "
+                + ", ".join(name for _, name in ancestry_specs)
             )
+            ancestry_count = 0
+            for preds, closure_predicate_name in ancestry_specs:
+                for entity in relevant_entities:
+                    ancestors = set(
+                        ancestor
+                        for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=preds)
+                        if ancestor.startswith(ontology_prefix)
+                    )
+                    for ancestor in ancestors:
+                        relation_dict = _create_relation(entity, closure_predicate_name, ancestor, ontology_terms_dict)
+                        ontology_relations.append(relation_dict)
+                        ancestry_count += 1
 
-            # Create relations for each ancestor
-            for ancestor in ancestors:
-                relation_dict = _create_relation(entity, "entailed_isa_partof_closure", ancestor, ontology_terms_dict)
-                ontology_relations.append(relation_dict)
-                ancestry_count += 1
+            logger.info(f"Processed {ancestry_count} ancestry relationships")
 
-        logger.info(f"Processed {ancestry_count} ancestry relationships")
         logger.info(f"Total relations: {len(ontology_relations)}")
 
         # Return the relations and updated ontology terms
         return ontology_relations, list(ontology_terms_dict.values())
+
+
+def _normalize_closure_spec(closure) -> tuple:
+    """
+    Normalize the ``closure`` argument to a deduped tuple in stable order.
+
+    Accepts a single string or any iterable of strings. Returns a tuple of concrete
+    closure names: a subset of ``('combined', 'isa', 'partof')``, or the single-element
+    tuple ``('none',)``.
+
+    Convenience values:
+      - ``'all'``: expands to ``('combined', 'isa', 'partof')``. Exclusive — cannot be
+        combined with any other value.
+      - ``'none'``: emit no ancestry closure. Exclusive — cannot be combined with any
+        other value.
+
+    Raises ``ValueError`` on unknown values or on illegal combinations.
+    """
+    if isinstance(closure, str):
+        items = [closure]
+    else:
+        items = list(closure)
+    if not items:
+        raise ValueError(f"closure must include at least one value from {VALID_CLOSURES}; got empty.")
+    seen: list[str] = []
+    for c in items:
+        if c not in VALID_CLOSURES:
+            raise ValueError(f"Unknown closure {c!r}; expected one of {VALID_CLOSURES}.")
+        if c not in seen:
+            seen.append(c)
+
+    for exclusive in ("all", "none"):
+        if exclusive in seen and len(seen) > 1:
+            others = [c for c in seen if c != exclusive]
+            raise ValueError(f"closure={exclusive!r} is exclusive; cannot be combined with {others}.")
+
+    if seen == ["all"]:
+        return _ALL_CLOSURES
+    return tuple(seen)
