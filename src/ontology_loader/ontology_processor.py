@@ -58,7 +58,6 @@ def _create_relation(subject, predicate, obj, ontology_terms_dict):
 
 
 class OntologyProcessor:
-
     """Ontology Processor class to process ontology terms and relations."""
 
     def __init__(self, ontology: str, force_refresh: bool = True):

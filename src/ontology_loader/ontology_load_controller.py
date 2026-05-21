@@ -20,7 +20,6 @@ _UNSET = object()
 
 
 class OntologyLoaderController:
-
     """
     Orchestrates extraction + loading of one or more ontologies into MongoDB.
 
