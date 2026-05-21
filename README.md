@@ -192,20 +192,56 @@ See `CHANGELOG.md` for the full release note and a side-by-side migration code s
 
 ### Testing CRUD operations in a live MongoDB
 
-If you want to test the CRUD operations in a live MongoDB instance, you need to set two environment variables:
-MONGO_PASSWORD="your_valid_password"
-ENABLE_DB_TESTS=true
+The test suite follows a single convention: **tests that need MongoDB run automatically when MongoDB and credentials are available; they skip gracefully when not.**
 
-This will allow you to run tests to actually insert/update/delete records in your MongoDB tests instance instead
-of simply mocking the calls. You can then run the tests with the following command:
+In practice:
+
+- **Mock-only tests** (e.g. `tests/test_mock_mongodb_loader.py`) run unconditionally — no MongoDB or credentials needed.
+- **Tests that exercise a live MongoDB** are gated by `MONGO_PASSWORD` (and a few additionally require `ENABLE_DB_TESTS=true` as an extra safety check against accidental writes against unintended databases). When the gating env vars are unset, those tests skip with a clear reason; when they are set, the tests connect to the MongoDB pointed at by the rest of the `MONGO_*` env vars.
+
+Required env vars when running the live-DB tests:
+
+```bash
+export MONGO_HOST=localhost
+export MONGO_PORT=27017            # or whatever your local Mongo listens on
+export MONGO_USERNAME=admin
+export MONGO_PASSWORD="your_valid_password"
+export MONGO_DB=nmdc               # read by the loader (see src/ontology_loader/mongo_db_config.py)
+export MONGO_DBNAME=nmdc           # read by tests/test_ontology_class_null_values.py — currently a separate name from MONGO_DB
+export ENABLE_DB_TESTS=true        # required by tests/test_ontology_load_controller.py
+```
+
+Then:
 
 ```bash
 make test
 ```
- 
-The same test command will run without the environment variables, but it will only mock the calls to the database.
-This is intended to help prevent accidental data loss or corruption in a live database environment and to 
-ensure that MONGO_PASSWORD is not hardcoded in the codebase.
+
+Same command runs without the env vars; the DB-gated tests just skip. Mock-only tests still run either way. This is intended both to prevent accidental writes against a live database when env vars aren't deliberately set, and to make sure `MONGO_PASSWORD` is never hardcoded in the codebase.
+
+> **Known inconsistencies (separate PRs in flight):**
+>
+> - `tests/test_linkml_store_client_connections.py` still hardcodes `MONGO_PORT = 27022` (and host / user / db). PR #23 makes it read from env vars to match the rest of the suite.
+> - GitHub Actions CI doesn't yet spin up a MongoDB service; the DB-gated tests skip in CI. PR #39 adds a `services: mongo:` block and sets the env vars on the test step.
+
+#### Safety rules for DB-writing tests
+
+Any test that **writes or modifies** MongoDB documents must follow these rules:
+
+1. **Use a dedicated scratch database or collection name** — never the production names (`nmdc`, `ontology_class_set`, `ontology_relation_set`). The scratch name should be specific enough that it can't collide with real data (e.g. `ontology_loader_smoke_test`).
+2. **Verify the target does not already exist before writing** — if it does, the test must fail loudly with a clear message so the developer investigates rather than silently overwriting unrelated data.
+3. **Clean up unconditionally at the end** — wrap the test in `try` / `finally` so the cleanup runs even when assertions fail.
+
+The smoke test `tests/test_cli_smoke.py::test_controller_end_to_end_against_live_mongo` shows the pattern.
+
+#### What each live-DB test does
+
+| File | What it touches |
+|---|---|
+| `tests/test_linkml_store_client_connections.py` | Verifies that both raw `pymongo` and linkml-store's `Client` can establish a connection. |
+| `tests/test_ontology_class_null_values.py` | Inserts and reads ontology class docs to confirm boolean/text fields don't store `null`. |
+| `tests/test_ontology_load_controller.py` | Runs `OntologyLoaderController.run_ontology_loader()` against a small live ENVO load. |
+| `tests/test_cli_smoke.py::test_controller_end_to_end_against_live_mongo` | Stubs the heavy semsql step, runs the controller end-to-end against MongoDB, and verifies the expected documents land. |
 
 ### Reset collections in dev
 
