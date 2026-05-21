@@ -181,13 +181,16 @@ class OntologyProcessor:
         Retrieve ontology direct relations + ancestry closure for the configured ontology.
 
         :param closure: A closure spec — either a single string or an iterable of strings drawn from
-            {'combined', 'isa', 'partof', 'none'}. Multiple values combine: e.g. ``['combined', 'isa']``
-            emits both ``entailed_isa_partof_closure`` and ``entailed_isa_closure``. ``'none'`` is
-            exclusive — passing it together with any other value raises ValueError.
+            {'combined', 'isa', 'partof', 'all', 'none'}. Multiple values combine: e.g.
+            ``['combined', 'isa']`` emits both ``entailed_isa_partof_closure`` and
+            ``entailed_isa_closure``. ``'all'`` and ``'none'`` are convenience values and are each
+            exclusive — passing either together with any other value raises ValueError.
 
             - 'combined': rdfs:subClassOf + BFO:0000050 → entailed_isa_partof_closure (Sierra default)
             - 'isa': rdfs:subClassOf → entailed_isa_closure
             - 'partof': BFO:0000050 → entailed_partof_closure
+            - 'all': expands to 'combined', 'isa', and 'partof'
+            - 'none': no ancestry closure; only direct relationships
             - 'none': no ancestry closure; only direct relationships
         :param ontology_terms: List of OntologyClass objects (default: None).
         :return: Tuple of (ontology_relations, updated_ontology_terms).
@@ -208,7 +211,6 @@ class OntologyProcessor:
             direct_predicates = list(direct_predicates_set)
 
         ontology_prefix = self.ontology.upper() + ":"
-        predicates = ["rdfs:subClassOf", "BFO:0000050"] if predicates is None else predicates
         ontology_relations = []
 
         # Create dictionary for fast lookup of ontology terms
@@ -239,24 +241,14 @@ class OntologyProcessor:
             logger.info(
                 f"Processing ancestry relationships across {len(ancestry_specs)} closure type(s): "
                 + ", ".join(name for _, name in ancestry_specs)
-        # Process all ancestors for all entities in one batch
-        logger.info("Processing ancestry relationships...")
-        ancestry_count = 0
-
-        for entity in tqdm(
-            relevant_entities,
-            desc=f"Computing {self.ontology} ancestry closure",
-            unit="entity",
-        ):
-            # Get ancestors for this entity and filter to only include those from our ontology
-            ancestors = set(
-                ancestor
-                for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=predicates)
-                if self._matches_ontology(ancestor)
             )
             ancestry_count = 0
             for preds, closure_predicate_name in ancestry_specs:
-                for entity in relevant_entities:
+                for entity in tqdm(
+                    relevant_entities,
+                    desc=f"Computing {self.ontology} {closure_predicate_name}",
+                    unit="entity",
+                ):
                     ancestors = set(
                         ancestor
                         for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=preds)
@@ -266,7 +258,6 @@ class OntologyProcessor:
                         relation_dict = _create_relation(entity, closure_predicate_name, ancestor, ontology_terms_dict)
                         ontology_relations.append(relation_dict)
                         ancestry_count += 1
-
             logger.info(f"Processed {ancestry_count} ancestry relationships")
 
         logger.info(f"Total relations: {len(ontology_relations)}")

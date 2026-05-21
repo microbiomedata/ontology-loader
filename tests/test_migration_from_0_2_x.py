@@ -13,7 +13,6 @@ import warnings
 
 import pytest
 from click.testing import CliRunner
-
 from ontology_loader.cli import cli
 from ontology_loader.ontology_load_controller import OntologyLoaderController
 from ontology_loader.ontology_processor import _normalize_closure_spec

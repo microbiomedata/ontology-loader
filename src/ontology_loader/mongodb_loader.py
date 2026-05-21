@@ -7,6 +7,7 @@ from typing import List, Optional
 from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+from pymongo import MongoClient
 from tqdm import tqdm
 
 from ontology_loader.mongo_db_config import MongoDBConfig
@@ -112,9 +113,11 @@ def get_mongo_connection_string(db_config) -> str:
     Generate a formatted MongoDB connection string from a db_config object.
 
     Args:
+    ----
         db_config: An object containing MongoDB connection parameters.
 
     Returns:
+    -------
         str: A properly formatted MongoDB connection string.
 
     """
@@ -193,7 +196,9 @@ class MongoDBLoader:
         else:
             # Create a new connection using the connection string
             self.handle = get_mongo_connection_string(self.db_config)
-            logger.info(f"Connecting to mongodb://{self.db_config.db_host}:{self.db_config.db_port}/{self.db_config.db_name}")
+            logger.info(
+                f"Connecting to mongodb://{self.db_config.db_host}:{self.db_config.db_port}/{self.db_config.db_name}"
+            )
             self.client = Client(handle=self.handle)
             self.db = self.client.attach_database(handle=self.handle)
             # Raw pymongo client is constructed lazily — see the `_py_db` property below.
@@ -220,9 +225,11 @@ class MongoDBLoader:
         """
         Meticulous-mode load: upsert via linkml-store per-item.
 
-        Upsert ontology terms, clear/re-populate ontology relations, handle obsolescence, and manage hierarchy changes.
-        This is the path that produces the TSV reports and matches Sierra's 0.2.x behavior. For maximum-throughput
-        first-time loads, see :meth:`insert_ontology_data_fast_initial`.
+        Upsert ontology terms and relations incrementally, handle obsolescence, and manage hierarchy changes.
+        Relations are upserted individually; the collection is not cleared before loading, allowing multiple
+        ontologies to be loaded sequentially. This is the path that produces the TSV reports and matches
+        Sierra's 0.2.x behavior. For maximum-throughput first-time loads, see
+        :meth:`insert_ontology_data_fast_initial`.
 
         :param ontology_classes: A list of OntologyClass objects to upsert.
         :param ontology_relations: A list of OntologyRelation objects to upsert.
@@ -295,15 +302,21 @@ class MongoDBLoader:
         py_class = self._py_db[class_collection_name]
         py_relation = self._py_db[relation_collection_name]
 
-        class_docs = [_class_to_doc(obj) for obj in ontology_classes]
-        _bulk_insert(py_class, class_docs, batch_size=batch_size, label="classes")
+        class_count = _bulk_insert_iter(
+            py_class,
+            (_class_to_doc(obj) for obj in ontology_classes),
+            batch_size=batch_size,
+            label="classes",
+        )
 
-        relation_docs = [_relation_to_doc(rel) for rel in ontology_relations]
-        # Drop None values returned by _relation_to_doc for invalid relations
-        relation_docs = [d for d in relation_docs if d is not None]
-        _bulk_insert(py_relation, relation_docs, batch_size=batch_size, label="relations")
+        relation_count = _bulk_insert_iter(
+            py_relation,
+            (doc for rel in ontology_relations if (doc := _relation_to_doc(rel)) is not None),
+            batch_size=batch_size,
+            label="relations",
+        )
 
-        logging.info(f"Finished fast-initial insert: {len(class_docs)} classes, {len(relation_docs)} relations.")
+        logging.info(f"Finished fast-initial insert: {class_count} classes, {relation_count} relations.")
 
 
 def _class_to_doc(obj):
@@ -334,14 +347,21 @@ def _relation_to_doc(relation):
     return relation
 
 
-def _bulk_insert(py_collection, docs, batch_size, label):
-    """Run ``insert_many(batch, ordered=False)`` in batches; log per-batch progress."""
-    if not docs:
-        logging.info(f"No {label} to insert.")
-        return
-    total = len(docs)
-    logging.info(f"Inserting {total} {label} via pymongo.insert_many (batch_size={batch_size}).")
-    for start in range(0, total, batch_size):
-        batch = docs[start : start + batch_size]
+def _bulk_insert_iter(py_collection, docs_iter, batch_size, label):
+    """Stream ``insert_many(batch, ordered=False)`` from an iterator; returns the total inserted."""
+    total = 0
+    batch: list = []
+    for doc in docs_iter:
+        batch.append(doc)
+        if len(batch) >= batch_size:
+            py_collection.insert_many(batch, ordered=False)
+            total += len(batch)
+            batch = []
+    if batch:
         py_collection.insert_many(batch, ordered=False)
-    logging.info(f"Inserted {total} {label}.")
+        total += len(batch)
+    if total == 0:
+        logging.info(f"No {label} to insert.")
+    else:
+        logging.info(f"Inserted {total} {label} via pymongo.insert_many.")
+    return total
