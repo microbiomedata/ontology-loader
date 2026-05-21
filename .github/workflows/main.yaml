@@ -35,7 +35,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+        # Aligned with pyproject.toml's `python = "^3.10"`. 3.9 was previously
+        # in the matrix despite the project not declaring support for it;
+        # coverage's 3.10+ requirement made that mismatch surface.
+        python-version: [ '3.10', '3.11', '3.12' ]
 
     services:
       # Spin up a MongoDB the live-DB tests can connect to. The host port is
