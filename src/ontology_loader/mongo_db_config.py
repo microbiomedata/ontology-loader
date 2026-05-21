@@ -60,6 +60,7 @@ class MongoDBConfig:
         When set, this client will be used instead of creating a new connection.
 
         Args:
+        ----
             client: An existing pymongo.MongoClient instance
 
         """
@@ -69,7 +70,8 @@ class MongoDBConfig:
         """
         Check if an existing MongoDB client has been set.
 
-        Returns:
+        Returns
+        -------
             bool: True if an existing client is available, False otherwise
 
         """

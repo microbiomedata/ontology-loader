@@ -7,6 +7,7 @@ from typing import List, Optional
 from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+from pymongo import MongoClient
 from tqdm import tqdm
 
 from ontology_loader.mongo_db_config import MongoDBConfig
@@ -14,6 +15,10 @@ from ontology_loader.reporter import Report
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+# Batch size for the fast-initial path's pymongo.insert_many calls. Tuned to keep memory
+# bounded for >50M relation docs while still amortizing the round-trip cost.
+_FAST_INITIAL_BATCH_SIZE = 5000
 
 
 def _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection):
@@ -108,9 +113,11 @@ def get_mongo_connection_string(db_config) -> str:
     Generate a formatted MongoDB connection string from a db_config object.
 
     Args:
+    ----
         db_config: An object containing MongoDB connection parameters.
 
     Returns:
+    -------
         str: A properly formatted MongoDB connection string.
 
     """
@@ -184,14 +191,29 @@ class MongoDBLoader:
             mongodb_db._native_db = self.db_config.existing_client[self.db_config.db_name]
 
             self.db = db
+            # Raw pymongo handle for the fast-initial write path: reuse the caller's client.
+            self._py_client = self.db_config.existing_client
         else:
             # Create a new connection using the connection string
             self.handle = get_mongo_connection_string(self.db_config)
-            logger.info(f"Connecting to mongodb://{self.db_config.db_host}:{self.db_config.db_port}/{self.db_config.db_name}")
+            logger.info(
+                f"Connecting to mongodb://{self.db_config.db_host}:{self.db_config.db_port}/{self.db_config.db_name}"
+            )
             self.client = Client(handle=self.handle)
             self.db = self.client.attach_database(handle=self.handle)
+            # Raw pymongo client is constructed lazily — see the `_py_db` property below.
+            # The meticulous path never needs it, and instantiating MongoClient(handle) eagerly
+            # blows up under mock-only test runs where MONGO_PASSWORD is unset.
+            self._py_client = None
 
         logger.info(f"Connected to MongoDB: {self.db}")
+
+    @property
+    def _py_db(self):
+        """Lazily-built raw pymongo database handle for the fast-initial write path."""
+        if self._py_client is None:
+            self._py_client = MongoClient(self.handle)
+        return self._py_client[self.db_config.db_name]
 
     def upsert_ontology_data(
         self,
@@ -201,7 +223,13 @@ class MongoDBLoader:
         relation_collection_name: str = "ontology_relation_set",
     ):
         """
-        Upsert ontology terms, clear/re-populate ontology relations, handle obsolescence, and manage hierarchy changes.
+        Meticulous-mode load: upsert via linkml-store per-item.
+
+        Upsert ontology terms and relations incrementally, handle obsolescence, and manage hierarchy changes.
+        Relations are upserted individually; the collection is not cleared before loading, allowing multiple
+        ontologies to be loaded sequentially. This is the path that produces the TSV reports and matches
+        Sierra's 0.2.x behavior. For maximum-throughput first-time loads, see
+        :meth:`insert_ontology_data_fast_initial`.
 
         :param ontology_classes: A list of OntologyClass objects to upsert.
         :param ontology_relations: A list of OntologyRelation objects to upsert.
@@ -248,3 +276,92 @@ class MongoDBLoader:
             Report("insert", insertions_report, ontology_fields),
             Report("insert", insertions_report_relations, ["subject", "predicate", "object"]),
         )
+
+    def insert_ontology_data_fast_initial(
+        self,
+        ontology_classes: List[OntologyClass],
+        ontology_relations: List[OntologyRelation],
+        class_collection_name: str = "ontology_class_set",
+        relation_collection_name: str = "ontology_relation_set",
+        batch_size: int = _FAST_INITIAL_BATCH_SIZE,
+    ):
+        """
+        Fast-initial mode: raw pymongo ``insert_many`` with no upsert and no reporting.
+
+        Intended for first-time installs of large ontologies (e.g. NCBITaxon, 2.7M classes + 54.7M relations)
+        where pre-read + upsert overhead dominates wall-clock. Caller is asserting the target collections are
+        either empty or that duplicate-key errors are acceptable — this method does not pre-clear, does not
+        deduplicate, and does not produce TSV reports.
+
+        :param ontology_classes: A list of OntologyClass objects to insert.
+        :param ontology_relations: A list of OntologyRelation objects to insert.
+        :param class_collection_name: MongoDB collection name for ontology classes.
+        :param relation_collection_name: MongoDB collection name for ontology relations.
+        :param batch_size: Documents per ``insert_many`` call. Default 5000.
+        """
+        py_class = self._py_db[class_collection_name]
+        py_relation = self._py_db[relation_collection_name]
+
+        class_count = _bulk_insert_iter(
+            py_class,
+            (_class_to_doc(obj) for obj in ontology_classes),
+            batch_size=batch_size,
+            label="classes",
+        )
+
+        relation_count = _bulk_insert_iter(
+            py_relation,
+            (doc for rel in ontology_relations if (doc := _relation_to_doc(rel)) is not None),
+            batch_size=batch_size,
+            label="relations",
+        )
+
+        logging.info(f"Finished fast-initial insert: {class_count} classes, {relation_count} relations.")
+
+
+def _class_to_doc(obj):
+    """
+    Convert an OntologyClass to a Mongo document, guaranteeing non-null is_root / is_obsolete.
+
+    Matches the same shape ``_upsert_ontology_class`` writes in the meticulous path.
+    """
+    doc = asdict(obj)
+    if doc.get("is_root") is None:
+        doc["is_root"] = False
+    if doc.get("is_obsolete") is None:
+        doc["is_obsolete"] = False
+    return doc
+
+
+def _relation_to_doc(relation):
+    """
+    Convert an OntologyRelation to a Mongo document, dropping malformed ones.
+
+    Matches the validity check in ``_upsert_relation``.
+    """
+    if type(relation) is OntologyRelation:
+        relation = asdict(relation)
+    if not relation.get("subject") or not relation.get("predicate") or not relation.get("object"):
+        logging.warning(f"Skipping invalid relation: {relation}")
+        return None
+    return relation
+
+
+def _bulk_insert_iter(py_collection, docs_iter, batch_size, label):
+    """Stream ``insert_many(batch, ordered=False)`` from an iterator; returns the total inserted."""
+    total = 0
+    batch: list = []
+    for doc in docs_iter:
+        batch.append(doc)
+        if len(batch) >= batch_size:
+            py_collection.insert_many(batch, ordered=False)
+            total += len(batch)
+            batch = []
+    if batch:
+        py_collection.insert_many(batch, ordered=False)
+        total += len(batch)
+    if total == 0:
+        logging.info(f"No {label} to insert.")
+    else:
+        logging.info(f"Inserted {total} {label} via pymongo.insert_many.")
+    return total
