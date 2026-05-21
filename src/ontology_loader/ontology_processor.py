@@ -134,8 +134,6 @@ class OntologyProcessor:
             desc=f"Extracting {self.ontology} classes (non-obsolete)",
             unit="entity",
         ):
-            if entity.startswith(ontology_prefix):
-        for entity in self.adapter.entities(filter_obsoletes=True):
             if self._matches_ontology(entity):
                 ontology_class = self._create_ontology_class(entity, is_obsolete=False)
                 ontology_classes.append(ontology_class)
@@ -146,8 +144,6 @@ class OntologyProcessor:
             desc=f"Extracting {self.ontology} classes (obsolete)",
             unit="entity",
         ):
-            if obsolete_entity.startswith(ontology_prefix):
-        for obsolete_entity in self.adapter.obsoletes():
             if self._matches_ontology(obsolete_entity):
                 ontology_class = self._create_ontology_class(obsolete_entity, is_obsolete=True)
                 ontology_classes.append(ontology_class)
