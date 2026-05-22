@@ -209,13 +209,15 @@ class MongoDBLoader:
         :param relation_collection_name: MongoDB collection name for ontology relations.
         :return: A tuple of three reports: class updates, class insertions, and relation insertions.
         """
-        # Use default collection names if not specified
-
-        # Get the collections (they should already exist and have indexes from initialization)
+        # Create the target collections if missing (no-op when they already exist;
+        # recreate_if_exists=False preserves data across reruns) and (re)declare
+        # the indexes. `linkml_store`'s `collection.index(...)` is idempotent.
         class_collection = self.db.create_collection(class_collection_name, recreate_if_exists=False)
         relation_collection = self.db.create_collection(relation_collection_name, recreate_if_exists=False)
 
         class_collection.index("id", unique=False, name="ontology_class_index")
+        class_collection.index("is_obsolete", unique=False, name="ontology_class_is_obsolete_index")
+        class_collection.index("name", unique=False, name="ontology_class_name_index")
         relation_collection.index(["subject", "predicate", "object"], unique=False, name="ontology_relation_index")
 
         # Step 1: Upsert ontology terms
