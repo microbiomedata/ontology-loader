@@ -132,7 +132,6 @@ def get_mongo_connection_string(db_config) -> str:
 
 
 class MongoDBLoader:
-
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
     def __init__(self, schema_view: Optional[SchemaView] = None, mongo_client=None, db_name: Optional[str] = None):
