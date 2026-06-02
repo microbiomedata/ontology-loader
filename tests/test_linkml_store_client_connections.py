@@ -6,11 +6,13 @@ import pytest
 from linkml_store.api.client import Client
 from pymongo import MongoClient
 
-# MongoDB Connection Parameters
-MONGO_HOST = "localhost"
-MONGO_PORT = 27022
-MONGO_DB = "nmdc"  # Database where you want to insert/update
-MONGO_USER = "admin"
+# MongoDB connection parameters — read from environment to match the rest of
+# the test suite (e.g. tests/test_ontology_class_null_values.py:12-16) and
+# the loader itself (src/ontology_loader/mongo_db_config.py:23-27). See #22.
+MONGO_HOST = os.getenv("MONGO_HOST", "localhost")
+MONGO_PORT = int(os.getenv("MONGO_PORT", "27017"))
+MONGO_DB = os.getenv("MONGO_DBNAME", "nmdc")
+MONGO_USER = os.getenv("MONGO_USERNAME", "admin")
 MONGO_PASSWORD = os.getenv("MONGO_PASSWORD", "")
 AUTH_DB = "admin"  # Authentication database
 
