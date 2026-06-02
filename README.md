@@ -11,7 +11,7 @@ specified by NMDC schema.
 
 - `Client(handle=...)` / `attach_database(...)` — declarative connection that integrates with NMDC's LinkML schema tooling.
 - `db.create_collection(name, recreate_if_exists=False)` — idempotent collection setup.
-- `collection.index(...)` — idempotent index declaration on `id`, `is_obsolete`, `name` (class collection) and `(subject, predicate, object)` (relation collection).
+- `collection.index(...)` — idempotent index declaration on `id`, `name` (class collection) and `(subject, predicate, object)` (relation collection).
 - `_handle_obsolete_terms` — per-item processing of the small obsolete subset.
 
 **Raw pymongo (the hot-path bypass).** Used only for the bulk-upsert phase, exposed via the lazy `MongoDBLoader._py_db` property:
