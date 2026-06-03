@@ -7,6 +7,7 @@ from typing import List, Optional
 from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+from tqdm import tqdm
 
 from ontology_loader.mongo_db_config import MongoDBConfig
 from ontology_loader.reporter import Report
@@ -131,7 +132,6 @@ def get_mongo_connection_string(db_config) -> str:
 
 
 class MongoDBLoader:
-
     """MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB."""
 
     def __init__(self, schema_view: Optional[SchemaView] = None, mongo_client=None, db_name: Optional[str] = None):
@@ -187,7 +187,7 @@ class MongoDBLoader:
         else:
             # Create a new connection using the connection string
             self.handle = get_mongo_connection_string(self.db_config)
-            logger.info(f"MongoDB connection string: {self.handle}")
+            logger.info(f"Connecting to mongodb://{self.db_config.db_host}:{self.db_config.db_port}/{self.db_config.db_name}")
             self.client = Client(handle=self.handle)
             self.db = self.client.attach_database(handle=self.handle)
 
@@ -209,13 +209,14 @@ class MongoDBLoader:
         :param relation_collection_name: MongoDB collection name for ontology relations.
         :return: A tuple of three reports: class updates, class insertions, and relation insertions.
         """
-        # Use default collection names if not specified
-
-        # Get the collections (they should already exist and have indexes from initialization)
+        # Create the target collections if missing (no-op when they already exist;
+        # recreate_if_exists=False preserves data across reruns) and (re)declare
+        # the indexes. `linkml_store`'s `collection.index(...)` is idempotent.
         class_collection = self.db.create_collection(class_collection_name, recreate_if_exists=False)
         relation_collection = self.db.create_collection(relation_collection_name, recreate_if_exists=False)
 
         class_collection.index("id", unique=False, name="ontology_class_index")
+        class_collection.index("name", unique=False, name="ontology_class_name_index")
         relation_collection.index(["subject", "predicate", "object"], unique=False, name="ontology_relation_index")
 
         # Step 1: Upsert ontology terms
@@ -227,7 +228,7 @@ class MongoDBLoader:
         _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection)
 
         # Step 1.2: Upsert ontology classes
-        for obj in ontology_classes:
+        for obj in tqdm(ontology_classes, desc="Upserting ontology classes", unit="class"):
             was_updated, report_row = _upsert_ontology_class(obj, class_collection, ontology_fields)
             if was_updated and report_row:
                 updates_report.append(report_row)
@@ -235,7 +236,7 @@ class MongoDBLoader:
                 insertions_report.append(report_row)
 
         # Step 2: Upsert relations
-        for relation in ontology_relations:
+        for relation in tqdm(ontology_relations, desc="Upserting ontology relations", unit="rel"):
             report_data = _upsert_relation(relation, relation_collection)
             if report_data:
                 insertions_report_relations.append(report_data)

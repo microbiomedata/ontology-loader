@@ -1,6 +1,43 @@
 """Test OntologyProcessor class and its methods."""
 
+import pytest
+
 from src.ontology_loader.ontology_processor import OntologyProcessor
+
+
+@pytest.mark.parametrize(
+    "ontology_name, entity_id, expected",
+    [
+        # Same-case prefixes (the historical path)
+        ("envo", "ENVO:00002005", True),
+        ("envo", "envo:00002005", True),
+        ("uberon", "UBERON:0000001", True),
+        ("po", "PO:0000001", True),
+        # Mixed-case prefixes that the prior `.upper()`-based filter dropped silently
+        ("ncbitaxon", "NCBITaxon:9606", True),
+        ("ncbitaxon", "NCBITAXON:9606", True),
+        ("ncbitaxon", "ncbitaxon:9606", True),
+        ("chebi", "CHEBI:12345", True),
+        # Wrong ontology — must reject
+        ("envo", "UBERON:0000001", False),
+        ("ncbitaxon", "PR:Q9606", False),
+        # Missing colon — must reject
+        ("ncbitaxon", "NCBITaxon", False),
+        ("envo", "ENVO", False),
+        ("envo", "", False),
+    ],
+)
+def test_matches_ontology(ontology_name, entity_id, expected):
+    """`_matches_ontology` compares the CURIE head case-insensitively to the configured ontology."""
+
+    # Avoid the heavy `OntologyProcessor.__init__` (which downloads + opens sqlite); the method
+    # only depends on `self._ontology_lc`, so a minimal stand-in object is sufficient.
+    class _Fake:
+        pass
+
+    fake = _Fake()
+    fake._ontology_lc = ontology_name.lower()
+    assert OntologyProcessor._matches_ontology(fake, entity_id) is expected
 
 
 def test_ontology_processor():
