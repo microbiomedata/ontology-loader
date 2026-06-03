@@ -1,13 +1,34 @@
 ## ontology_loader
 
-Suite of tools to configure and load an ontology from the OboFoundary into the data object for OntologyClass as 
-specified by NMDC schema.
+A suite of tools to configure and load an ontology from the OboFoundary into the data object for OntologyClass as 
+specified by the NMDC schema.
+
+## Architecture: MongoDB access patterns
+
+`MongoDBLoader` reaches MongoDB through two paths simultaneously — a deliberate hybrid, not an oversight.
+
+**linkml-store.** Used for schema-aware setup and for any path where per-document work is acceptable:
+
+- `Client(handle=...)` / `attach_database(...)` — declarative connection that integrates with NMDC's LinkML schema tooling.
+- `db.create_collection(name, recreate_if_exists=False)` — idempotent collection setup.
+- `collection.index(...)` — idempotent index declaration on `id`, `name` (class collection) and `(subject, predicate, object)` (relation collection).
+- `_handle_obsolete_terms` — per-item processing of the small obsolete subset.
+
+**Raw pymongo.** Used only for the bulk-upsert phase, exposed via the lazy `MongoDBLoader._py_db` property:
+
+- `py_collection.bulk_write([UpdateOne(...upsert=True), ...], ordered=False)`.
+
+### Why both?
+
+`linkml_store.api.stores.mongodb.mongodb_collection.upsert` (as of the version pinned here) iterates per-item with `find_one` followed by `update_one`/`insert_one`. For small ontologies, that's fine. For larger ones, it's too slow.
+
+The pymongo path is a *bypass*, not a permanent split. Upstream issue [`linkml/linkml-store#77`](https://github.com/linkml/linkml-store/issues/77) tracks adding `bulk_write` support to linkml-store. 
 
 ## Development Environment
 
 #### Pre-requisites
 
-- >=Python 3.9
+- >=Python 3.10
 - Poetry
 - Docker
 - MongoDB
@@ -150,12 +171,8 @@ Then:
 make test
 ```
 
-Same command runs without the env vars; the DB-gated tests just skip. Mock-only tests still run either way. This is intended both to prevent accidental writes against a live database when env vars aren't deliberately set, and to make sure `MONGO_PASSWORD` is never hardcoded in the codebase.
-
-> **Known inconsistencies (separate PRs in flight):**
->
-> - `tests/test_linkml_store_client_connections.py` still hardcodes `MONGO_PORT = 27022` (and host / user / db). PR #23 makes it read from env vars to match the rest of the suite.
-> - GitHub Actions CI doesn't yet spin up a MongoDB service; the DB-gated tests skip in CI. PR #39 adds a `services: mongo:` block and sets the env vars on the test step.
+Same command runs without the env vars; the DB-gated tests just skip. Mock-only tests still run either way. This is intended both to prevent accidental writes against a live database when env 
+vars aren't deliberately set, and to make sure `MONGO_PASSWORD` is never hardcoded in the codebase.
 
 #### Safety rules for DB-writing tests
 
@@ -174,7 +191,12 @@ The smoke test `tests/test_cli_smoke.py::test_controller_end_to_end_against_live
 | `tests/test_linkml_store_client_connections.py` | Verifies that both raw `pymongo` and linkml-store's `Client` can establish a connection. |
 | `tests/test_ontology_class_null_values.py` | Inserts and reads ontology class docs to confirm boolean/text fields don't store `null`. |
 | `tests/test_ontology_load_controller.py` | Runs `OntologyLoaderController.run_ontology_loader()` against a small live ENVO load. |
-| `tests/test_cli_smoke.py::test_controller_end_to_end_against_live_mongo` | Stubs the heavy semsql step, runs the controller end-to-end against MongoDB, and verifies the expected documents land. |
+| `tests/test_cli_smoke.py::test_controller_end_to_end_against_live_mongo` | Stubs the heavy semsql step, runs the controller end-to-end against MongoDB, and verifies the expected documents. |
+=======
+ 
+The same test command will run without the environment variables, but it will only mock database calls.
+This is intended to help prevent accidental data loss or corruption in a live database environment and to 
+ensure that MONGO_PASSWORD is not hardcoded in the codebase.
 
 ### Reset collections in dev
 
