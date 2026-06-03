@@ -116,7 +116,7 @@ def _open_mongo_client():
         )
     except Exception as e:  # noqa: BLE001 — best-effort connect
         print(
-            f"\n[conftest] could not connect to MongoDB for test_db cleanup " f"({type(e).__name__}: {e}).",
+            f"\n[conftest] could not connect to MongoDB for test_db cleanup ({type(e).__name__}: {e}).",
             file=sys.stderr,
         )
         return None

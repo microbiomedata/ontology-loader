@@ -137,9 +137,7 @@ class OntologyLoaderController:
             raise ValueError("source_ontology must include at least one ontology name.")
 
         self.report_directory = (
-            report_directory
-            if report_directory is not None
-            else tempfile.mkdtemp(prefix="ontology_loader_reports_")
+            report_directory if report_directory is not None else tempfile.mkdtemp(prefix="ontology_loader_reports_")
         )
         self.mongo_client = mongo_client
         self.db_name = db_name
