@@ -236,11 +236,6 @@ The smoke test `tests/test_cli_smoke.py::test_controller_end_to_end_against_live
 | `tests/test_ontology_class_null_values.py` | Inserts and reads ontology class docs to confirm boolean/text fields don't store `null`. |
 | `tests/test_ontology_load_controller.py` | Runs `OntologyLoaderController.run_ontology_loader()` against a small live ENVO load. |
 | `tests/test_cli_smoke.py::test_controller_end_to_end_against_live_mongo` | Stubs the heavy semsql step, runs the controller end-to-end against MongoDB, and verifies the expected documents. |
-=======
- 
-The same test command will run without the environment variables, but it will only mock database calls.
-This is intended to help prevent accidental data loss or corruption in a live database environment and to 
-ensure that MONGO_PASSWORD is not hardcoded in the codebase.
 
 ### Reset collections in dev
 
