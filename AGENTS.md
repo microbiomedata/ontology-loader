@@ -14,15 +14,15 @@ calls `OntologyLoaderController`).
 - **linkml-store** — schema-aware setup (declarative connection, idempotent collection/index creation) and per-item
 work where that's acceptable (e.g. obsolete-term handling).
 - **Raw pymongo** — used only for the bulk-upsert phase, via the lazy `MongoDBLoader._py_db` property, 
-because `linkml-store`'s `upsert` iterates per-item (`find_one` + `update_one`/`insert_one`), which is too slow for large ontologies.
-
-The pymongo path is a *bypass*, not a permanent split. Upstream issue [`linkml/linkml-store#77`](https://github.com/linkml/linkml-store/issues/77) tracks adding `bulk_write` support to linkml-store.
+because `linkml-store`'s `upsert` iterates per-item (`find_one` + `update_one`/`insert_one`), which is too slow for 
+large ontologies.
 
 ## Repo management
 
 This repo uses `poetry` for managing dependencies. Never use commands like `pip` to add or manage dependencies.
 
-Note the pinned constraint `setuptools = "<80"` (issue #42): `eutils` (transitive via `oaklib`) imports `pkg_resources` at module load and breaks on setuptools >=80.
+Note the pinned constraint `setuptools = "<80"` (issue #42): `eutils` (transitive via `oaklib`) imports 
+`pkg_resources` at module load and breaks on setuptools >=80.
 
 ## Repository structure
 
@@ -58,7 +58,8 @@ The CLI exposes four flags (see README for full detail):
 * always write pytest functional style rather than unittest OO style
 * use modern pytest idioms, including `@pytest.mark.parametrize` to test for combinations of inputs
 * NEVER write mock tests unless requested. I need to rely on tests to know if something breaks
-* For tests that have external dependencies, gate them on the `MONGO_*` env vars (see below) so they skip gracefully when MongoDB is unavailable
+* For tests that have external dependencies, gate them on the `MONGO_*` env vars (see below) so they skip gracefully 
+when MongoDB is unavailable
 * Do not "fix" issues by changing or weakening test conditions. Try harder, or ask questions if a test fails.
 * Avoid try/except blocks, these can mask bugs (except in test cleanup `try`/`finally`, see safety rules below)
 * Fail fast is a good principle
@@ -66,6 +67,8 @@ The CLI exposes four flags (see README for full detail):
 * Avoid repeating chunks of code, but also avoid premature over-abstraction
 * Declarative principles are favored
 * Always use type hints, always document methods and classes
+* Write in clear, concise tone.  Code docs should be clear and to the point.  No flowery langauge about why something is fixed or not.
+* Avoid jargon and tech-bro speak like "when this lands" or "in flight."
 
 ## Build and test
 
@@ -83,10 +86,12 @@ Pytest auto-enables coverage (`pytest-cov`) with an 80% threshold (configured in
 
 ## Testing against a live MongoDB
 
-The test suite follows a single convention: **tests that need MongoDB run automatically when MongoDB and credentials are available; they skip gracefully when not.**
+The test suite follows a single convention: **tests that need MongoDB run automatically when MongoDB and 
+credentials are available; they skip gracefully when not.**
 
 - **Mock-only tests** (e.g. `tests/test_mock_mongodb_loader.py`) run unconditionally — no MongoDB or credentials needed.
-- **Live-DB tests** are gated by `MONGO_PASSWORD` (some additionally require `ENABLE_DB_TESTS=true` as an extra safety check). When the gating env vars are unset, those tests skip with a clear reason.
+- **Live-DB tests** are gated by `MONGO_PASSWORD` (some additionally require `ENABLE_DB_TESTS=true` as an extra 
+safety check). When the gating env vars are unset, those tests skip with a clear reason.
 
 Required env vars for live-DB tests:
 ```bash
@@ -111,26 +116,9 @@ Any test that **writes or modifies** MongoDB documents must:
 
 1. **Use a dedicated scratch database or collection name** — never the production names (`nmdc`, `ontology_class_set`, `ontology_relation_set`). Use something that can't collide with real data (e.g. `ontology_loader_smoke_test`).
 2. **Verify the target does not already exist before writing** — if it does, fail loudly so the developer investigates rather than silently overwriting data.
-3. **Clean up unconditionally** — wrap the test in `try` / `finally` so cleanup runs even when assertions fail.
+3. **Clean up**.
 
 The smoke test `tests/test_cli_smoke.py::test_controller_end_to_end_against_live_mongo` shows the pattern.
-
-## Releasing
-
-Versioning is git-based via `poetry-dynamic-versioning` (PEP440). `pyproject.toml` carries `version = "0.0.0"` and the build backend is `poetry-dynamic-versioning.backend`.
-
-1. Decide the new version following semver (e.g. `v0.3.0`). Previous releases: https://github.com/microbiomedata/ontology-loader/releases.
-2. Create the GitHub release from `main`:
-   ```
-   gh release create vX.Y.Z --target main --generate-notes --repo microbiomedata/ontology-loader
-   ```
-3. This triggers `.github/workflows/publish.yaml`, which runs `poetry build` and publishes `nmdc-ontology-loader` to PyPI.
-
-## Related repositories
-
-- [nmdc-runtime](https://github.com/microbiomedata/nmdc-runtime) — Dagster/Dagit runtime whose `load_ontology` op calls `OntologyLoaderController` (0.2.x backwards compatibility is maintained).
-- [nmdc-schema](https://github.com/microbiomedata/nmdc-schema) — Defines the `OntologyClass` / `OntologyRelation` models.
-- [linkml-store](https://github.com/linkml/linkml-store) — Schema-aware MongoDB wrapper; issue #77 tracks the bulk-write support this repo currently bypasses.
 
 ## Important conventions
 
