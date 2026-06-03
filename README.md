@@ -1,13 +1,34 @@
 ## ontology_loader
 
-Suite of tools to configure and load an ontology from the OboFoundary into the data object for OntologyClass as 
-specified by NMDC schema.
+A suite of tools to configure and load an ontology from the OboFoundary into the data object for OntologyClass as 
+specified by the NMDC schema.
+
+## Architecture: MongoDB access patterns
+
+`MongoDBLoader` reaches MongoDB through two paths simultaneously — a deliberate hybrid, not an oversight.
+
+**linkml-store.** Used for schema-aware setup and for any path where per-document work is acceptable:
+
+- `Client(handle=...)` / `attach_database(...)` — declarative connection that integrates with NMDC's LinkML schema tooling.
+- `db.create_collection(name, recreate_if_exists=False)` — idempotent collection setup.
+- `collection.index(...)` — idempotent index declaration on `id`, `name` (class collection) and `(subject, predicate, object)` (relation collection).
+- `_handle_obsolete_terms` — per-item processing of the small obsolete subset.
+
+**Raw pymongo.** Used only for the bulk-upsert phase, exposed via the lazy `MongoDBLoader._py_db` property:
+
+- `py_collection.bulk_write([UpdateOne(...upsert=True), ...], ordered=False)`.
+
+### Why both?
+
+`linkml_store.api.stores.mongodb.mongodb_collection.upsert` (as of the version pinned here) iterates per-item with `find_one` followed by `update_one`/`insert_one`. For small ontologies, that's fine. For larger ones, it's too slow.
+
+The pymongo path is a *bypass*, not a permanent split. Upstream issue [`linkml/linkml-store#77`](https://github.com/linkml/linkml-store/issues/77) tracks adding `bulk_write` support to linkml-store. 
 
 ## Development Environment
 
 #### Pre-requisites
 
-- >=Python 3.9
+- >=Python 3.10
 - Poetry
 - Docker
 - MongoDB
@@ -136,7 +157,7 @@ of simply mocking the calls. You can then run the tests with the following comma
 make test
 ```
  
-The same test command will run without the environment variables, but it will only mock the calls to the database.
+The same test command will run without the environment variables, but it will only mock database calls.
 This is intended to help prevent accidental data loss or corruption in a live database environment and to 
 ensure that MONGO_PASSWORD is not hardcoded in the codebase.
 
