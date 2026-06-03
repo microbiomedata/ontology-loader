@@ -191,7 +191,6 @@ class OntologyProcessor:
             - 'partof': BFO:0000050 → entailed_partof_closure
             - 'all': expands to 'combined', 'isa', and 'partof'
             - 'none': no ancestry closure; only direct relationships
-            - 'none': no ancestry closure; only direct relationships
         :param ontology_terms: List of OntologyClass objects (default: None).
         :return: Tuple of (ontology_relations, updated_ontology_terms).
         """
@@ -210,7 +209,6 @@ class OntologyProcessor:
                 ancestry_specs.append((preds, name))
             direct_predicates = list(direct_predicates_set)
 
-        ontology_prefix = self.ontology.upper() + ":"
         ontology_relations = []
 
         # Create dictionary for fast lookup of ontology terms
@@ -252,7 +250,7 @@ class OntologyProcessor:
                     ancestors = set(
                         ancestor
                         for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=preds)
-                        if ancestor.startswith(ontology_prefix)
+                        if self._matches_ontology(ancestor)
                     )
                     for ancestor in ancestors:
                         relation_dict = _create_relation(entity, closure_predicate_name, ancestor, ontology_terms_dict)

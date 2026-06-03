@@ -300,6 +300,12 @@ class MongoDBLoader:
         :param relation_collection_name: MongoDB collection name for ontology relations.
         :param batch_size: Documents per ``insert_many`` call. Default 5000.
         """
+        logging.warning(
+            "fast-initial mode does not pre-clear or deduplicate: it raw-inserts into "
+            f"'{class_collection_name}' and '{relation_collection_name}'. Rerunning against "
+            "populated collections will raise DuplicateKeyError. Ensure these collections are empty."
+        )
+
         py_class = self._py_db[class_collection_name]
         py_relation = self._py_db[relation_collection_name]
 
