@@ -24,6 +24,12 @@ tox = "^4.24.1"
 pytest = "^8.3.4"
 pytest-cov = "^7.1.0"
 mongomock = "^4.3.0"
+
+# setuptools 80.0.0 (April 2025) removed the bundled `pkg_resources/` package.
+# `eutils` (transitive via `oaklib`) still does `import pkg_resources` at
+# module load time and breaks on setuptools >= 80. Pin until eutils migrates
+# to `importlib.metadata`. See #42.
+setuptools = "<80"
 tqdm = "^4.67.3"
 
 [tool.poetry.group.dev.dependencies]
