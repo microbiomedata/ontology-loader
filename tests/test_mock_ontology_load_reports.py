@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-
 from ontology_loader.mongodb_loader import MongoDBLoader
 from ontology_loader.ontology_load_controller import OntologyLoaderController
 from ontology_loader.utils import load_yaml_from_package
@@ -49,8 +48,7 @@ def ontology_loader():
     """
     return OntologyLoaderController(
         source_ontology="envo",
-        output_directory=tempfile.gettempdir(),
-        generate_reports=True,
+        report_directory=tempfile.gettempdir(),
     )
 
 

@@ -4,7 +4,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
-
 from ontology_loader.mongodb_loader import MongoDBLoader, Report, _handle_obsolete_terms
 from ontology_loader.utils import load_yaml_from_package
 

@@ -33,8 +33,9 @@ from ontology_loader.ontology_load_controller import OntologyLoaderController
 # without a corresponding parameter (or vice versa).
 EXPECTED_FLAGS = {
     "--source-ontology",
-    "--output-directory",
-    "--generate-reports",
+    "--report-directory",
+    "--mode",
+    "--closure",
     "--help",
 }
 

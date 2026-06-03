@@ -6,7 +6,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-
 from ontology_loader.mongodb_loader import MongoDBLoader, _handle_obsolete_terms
 from ontology_loader.ontology_load_controller import OntologyLoaderController
 from ontology_loader.utils import load_yaml_from_package
@@ -31,8 +30,7 @@ def ontology_loader():
     """
     return OntologyLoaderController(
         source_ontology="envo",
-        output_directory=tempfile.gettempdir(),
-        generate_reports=True,
+        report_directory=tempfile.gettempdir(),
     )
 
 
@@ -56,8 +54,7 @@ def ontology_loader_with_client(mock_mongo_client):
     """
     return OntologyLoaderController(
         source_ontology="envo",
-        output_directory=tempfile.gettempdir(),
-        generate_reports=True,
+        report_directory=tempfile.gettempdir(),
         mongo_client=mock_mongo_client,
         db_name="test_db",
     )
