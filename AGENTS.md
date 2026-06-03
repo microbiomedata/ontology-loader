@@ -6,9 +6,6 @@
 storing them as NMDC schema-compliant `OntologyClass` and `OntologyRelation` documents. It supports both incremental 
 updates and large-scale complex ontologies such as NCBITaxon (2.7M classes + 54.7M relations).
 
-It is published to PyPI as `nmdc-ontology-loader` and is consumed by `nmdc-runtime` (a Dagster/Dagit job that 
-calls `OntologyLoaderController`).
-
 ## Architecture: MongoDB access patterns
 
 - **linkml-store** — schema-aware setup (declarative connection, idempotent collection/index creation) and per-item
@@ -17,43 +14,9 @@ work where that's acceptable (e.g. obsolete-term handling).
 because `linkml-store`'s `upsert` iterates per-item (`find_one` + `update_one`/`insert_one`), which is too slow for 
 large ontologies.
 
-## Repo management
-
-This repo uses `poetry` for managing dependencies. Never use commands like `pip` to add or manage dependencies.
-
-Note the pinned constraint `setuptools = "<80"` (issue #42): `eutils` (transitive via `oaklib`) imports 
-`pkg_resources` at module load and breaks on setuptools >=80.
-
-## Repository structure
-
-- `src/ontology_loader/` — Application code.
-  - `cli.py` — Click CLI entry point (`ontology_loader`).
-  - `ontology_load_controller.py` — `OntologyLoaderController`, the main orchestrator.
-  - `ontology_processor.py` — Ontology extraction and closure computation.
-  - `mongodb_loader.py` — Core MongoDB interface (hybrid linkml-store + pymongo).
-  - `mongo_db_config.py` — `MONGO_*` env var parsing / connection config.
-  - `reporter.py` — TSV report generation.
-  - `utils.py` — Utilities.
-- `tests/` — Pytest test suite (`conftest.py` holds fixtures and DB cleanup).
-- `docs/` — Sphinx documentation.
-- `.github/workflows/` — CI/CD:
-  - `main.yaml` — lint + test matrix (Python 3.10/3.11/3.12, MongoDB 7 service) on push/PR.
-  - `publish.yaml` — build and publish to PyPI on GitHub release.
-  - `codespell.yaml` — spell checking.
-  - `deploy-docs.yaml` — Sphinx docs deploy to gh-pages.
-- `pyproject.toml`, `poetry.lock`, `Makefile`, `tox.ini` — build/dependency/test config.
-
-## CLI usage
-
-The CLI exposes four flags (see README for full detail):
-
-- `--source-ontology <name>` — required, repeatable. Lowercase prefix (envo, po, uberon, ncbitaxon, …). Processed sequentially in the given order.
-- `--report-directory <dir>` — TSV report destination (only used in `meticulous` mode). Defaults to a fresh temp directory.
-- `--mode {meticulous|fast-initial}` — default `meticulous` (per-item upsert, preserves 0.2.x behavior); `fast-initial` is a max-throughput first-time install via raw pymongo `insert_many`.
-- `--closure {combined|isa|partof|all|none}` — default `combined`. Repeatable; `all` and `none` are exclusive.
-
 ## Best practice
 
+* This repo uses `poetry` for managing dependencies. Never use commands like `pip` to add or manage dependencies.
 * write pytest tests
 * always write pytest functional style rather than unittest OO style
 * use modern pytest idioms, including `@pytest.mark.parametrize` to test for combinations of inputs
@@ -69,6 +32,10 @@ when MongoDB is unavailable
 * Always use type hints, always document methods and classes
 * Write in clear, concise tone.  Code docs should be clear and to the point.  No flowery langauge about why something is fixed or not.
 * Avoid jargon and tech-bro speak like "when this lands" or "in flight."
+* Production collection names are `ontology_class_set` and `ontology_relation_set` in the `nmdc` database — never write to these from tests. 
+* When passing an existing `MongoClient` to `OntologyLoaderController`, you must also provide `db_name` (it cannot be auto-determined from the client). 
+* The 0.2.x constructor kwargs (`output_directory`, `generate_reports`) continue to work as deprecated aliases — see the migration table in `README.md`. Do not break that backwards compatibility without explicit discussion. 
+* Never hardcode `MONGO_PASSWORD` in the codebase.
 
 ## Build and test
 
@@ -82,34 +49,6 @@ Run via Make:
 - `make test` — `poetry run pytest tests`
 - `make lint` — `poetry run tox -e lint-fix` (ruff format + ruff check --fix)
 
-Pytest auto-enables coverage (`pytest-cov`) with an 80% threshold (configured in `pyproject.toml`).
-
-## Testing against a live MongoDB
-
-The test suite follows a single convention: **tests that need MongoDB run automatically when MongoDB and 
-credentials are available; they skip gracefully when not.**
-
-- **Mock-only tests** (e.g. `tests/test_mock_mongodb_loader.py`) run unconditionally — no MongoDB or credentials needed.
-- **Live-DB tests** are gated by `MONGO_PASSWORD` (some additionally require `ENABLE_DB_TESTS=true` as an extra 
-safety check). When the gating env vars are unset, those tests skip with a clear reason.
-
-Required env vars for live-DB tests:
-```bash
-export MONGO_HOST=localhost
-export MONGO_PORT=27017            # or whatever your local Mongo listens on
-export MONGO_USERNAME=admin
-export MONGO_PASSWORD="your_valid_password"
-export MONGO_DB=nmdc               # read by the loader (src/ontology_loader/mongo_db_config.py)
-export MONGO_DBNAME=nmdc           # read by tests/test_ontology_class_null_values.py
-export ENABLE_DB_TESTS=true        # required by tests/test_ontology_load_controller.py
-```
-
-A local Mongo for development:
-```bash
-docker pull mongo
-docker run -d --name mongodb-container -p 27018:27017 mongo
-```
-
 ### Safety rules for DB-writing tests
 
 Any test that **writes or modifies** MongoDB documents must:
@@ -119,11 +58,3 @@ Any test that **writes or modifies** MongoDB documents must:
 3. **Clean up**.
 
 The smoke test `tests/test_cli_smoke.py::test_controller_end_to_end_against_live_mongo` shows the pattern.
-
-## Important conventions
-
-- Requires Python >=3.10.
-- Production collection names are `ontology_class_set` and `ontology_relation_set` in the `nmdc` database — never write to these from tests.
-- When passing an existing `MongoClient` to `OntologyLoaderController`, you must also provide `db_name` (it cannot be auto-determined from the client).
-- The 0.2.x constructor kwargs (`output_directory`, `generate_reports`) continue to work as deprecated aliases — see the migration table in `README.md`. Do not break that backwards compatibility without explicit discussion.
-- Never hardcode `MONGO_PASSWORD` in the codebase.
