@@ -30,7 +30,7 @@ when MongoDB is unavailable
 * Avoid repeating chunks of code, but also avoid premature over-abstraction
 * Declarative principles are favored
 * Always use type hints, always document methods and classes
-* Write in clear, concise tone.  Code docs should be clear and to the point.  No flowery langauge about why something is fixed or not.
+* Write in clear, concise tone.  Code docs should be clear and to the point.  No flowery language about why something is fixed or not.
 * Avoid jargon and tech-bro speak like "when this lands" or "in flight."
 * Production collection names are `ontology_class_set` and `ontology_relation_set` in the `nmdc` database — never write to these from tests. 
 * When passing an existing `MongoClient` to `OntologyLoaderController`, you must also provide `db_name` (it cannot be auto-determined from the client). 
