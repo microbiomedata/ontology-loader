@@ -435,3 +435,53 @@ def test_bulk_insert_iter_continues_past_a_duplicate_batch():
     assert collection.insert_many.call_count == 2
     assert total == 2  # batch 2's 2 new docs
     assert total_dupes == 2  # batch 1's 2 duplicates
+
+
+def test_insert_batch_skipping_duplicates_reraises_write_concern_errors():
+    """
+    Verify a write-concern failure propagates instead of being treated as a successful batch.
+
+    writeConcernErrors carry no writeErrors of their own, so a batch with a write-concern failure
+    (e.g. replication timeout) and zero duplicate-key writeErrors must not be mistaken for "all
+    inserted, zero duplicates."
+    """
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            "writeErrors": [],
+            "writeConcernErrors": [{"code": 64, "errmsg": "waiting for replication timed out"}],
+            "nInserted": 2,
+        }
+    )
+
+    with pytest.raises(BulkWriteError):
+        _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+
+def test_insert_batch_skipping_duplicates_uses_ninserted_not_derived_count():
+    """
+    Inserted/duplicate counts must come from nInserted, not len(batch) - len(writeErrors).
+
+    A batch where nInserted disagrees with the naive derived count (more writeErrors reported
+    than documents actually failed to insert, e.g. a retried write counted twice) must trust
+    nInserted rather than the arithmetic.
+    """
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            # 2 writeErrors would naively imply 1 inserted (3 - 2), but nInserted says 2.
+            "writeErrors": [
+                {"index": 0, "code": 11000, "errmsg": "dup"},
+                {"index": 1, "code": 11000, "errmsg": "dup"},
+            ],
+            "writeConcernErrors": [],
+            "nInserted": 2,
+        }
+    )
+
+    inserted, dupes = _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+    assert inserted == 2  # from nInserted, not (3 - 2) == 1
+    assert dupes == 2  # len(writeErrors), unaffected

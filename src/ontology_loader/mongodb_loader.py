@@ -387,7 +387,16 @@ def _insert_batch_skipping_duplicates(py_collection, batch, label):
     (no unique index) or dying partway through a multi-hour load (index present, error uncaught).
 
     Any write error that is NOT a duplicate-key error is not something this method knows how to
-    recover from, so it re-raises rather than silently swallowing an unexpected failure.
+    recover from, so it re-raises rather than silently swallowing an unexpected failure. The same
+    applies to ``writeConcernErrors`` (e.g. a replication-timeout failure): these carry no
+    ``writeErrors`` entries of their own, so treating an empty non-duplicate ``writeErrors`` list as
+    "fully successful, just some duplicates" would silently mask a real write-concern failure.
+
+    Inserted/duplicate counts come from ``bwe.details["nInserted"]``, the count MongoDB itself
+    reports actually landed, rather than being derived as ``len(batch) - len(writeErrors)``: the
+    two agree in the ordinary case, but the derived count assumes every non-erroring document was
+    inserted and exactly one writeError exists per failed document, assumptions ``nInserted``
+    doesn't need.
 
     :return: (inserted_count, duplicate_count) for this batch.
     """
@@ -395,6 +404,13 @@ def _insert_batch_skipping_duplicates(py_collection, batch, label):
         py_collection.insert_many(batch, ordered=False)
         return len(batch), 0
     except BulkWriteError as bwe:
+        write_concern_errors = bwe.details.get("writeConcernErrors", [])
+        if write_concern_errors:
+            logging.error(
+                f"Batch insert into {label} hit {len(write_concern_errors)} write-concern "
+                f"error(s); re-raising. First: {write_concern_errors[0]}"
+            )
+            raise
         write_errors = bwe.details.get("writeErrors", [])
         non_duplicate_errors = [e for e in write_errors if e.get("code") != _DUPLICATE_KEY_CODE]
         if non_duplicate_errors:
@@ -403,8 +419,8 @@ def _insert_batch_skipping_duplicates(py_collection, batch, label):
                 f"write error(s); re-raising. First: {non_duplicate_errors[0]}"
             )
             raise
+        inserted_count = bwe.details.get("nInserted", 0)
         duplicate_count = len(write_errors)
-        inserted_count = len(batch) - duplicate_count
         logging.info(f"Batch insert into {label}: {inserted_count} new, {duplicate_count} already present (skipped).")
         return inserted_count, duplicate_count
 
