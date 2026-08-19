@@ -4,7 +4,15 @@ from unittest.mock import MagicMock
 
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
-from ontology_loader.mongodb_loader import MongoDBLoader, Report, _handle_obsolete_terms
+from pymongo.errors import BulkWriteError
+
+from ontology_loader.mongodb_loader import (
+    MongoDBLoader,
+    Report,
+    _bulk_insert_iter,
+    _handle_obsolete_terms,
+    _insert_batch_skipping_duplicates,
+)
 from ontology_loader.utils import load_yaml_from_package
 
 
@@ -318,3 +326,112 @@ def test_upsert_ontology_data_with_obsolete_terms(mock_db, mock_obsolete_classes
     # The _handle_obsolete_terms function should look up each obsolete term
     for term_id in obsolete_terms:
         class_collection.find.assert_any_call({"id": term_id})
+
+
+# --- fast-initial duplicate handling ---------------------------------------------------------
+
+
+def test_insert_batch_skipping_duplicates_no_error():
+    """A batch with no collisions inserts cleanly; no duplicates reported."""
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}]
+
+    inserted, dupes = _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+    collection.insert_many.assert_called_once_with(batch, ordered=False)
+    assert inserted == 2
+    assert dupes == 0
+
+
+def test_insert_batch_skipping_duplicates_all_duplicate_key_errors():
+    """
+    A batch that is entirely duplicate-key rejections is treated as fully skipped, not re-raised.
+
+    This is the exact rerun-without-clearing scenario: every document in the batch already
+    exists, so pymongo reports one writeError per document, all code 11000.
+    """
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            "writeErrors": [
+                {"index": 0, "code": 11000, "errmsg": "E11000 duplicate key"},
+                {"index": 1, "code": 11000, "errmsg": "E11000 duplicate key"},
+                {"index": 2, "code": 11000, "errmsg": "E11000 duplicate key"},
+            ],
+            "nInserted": 0,
+        }
+    )
+
+    inserted, dupes = _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+    assert inserted == 0
+    assert dupes == 3
+
+
+def test_insert_batch_skipping_duplicates_partial_duplicates():
+    """A batch with some new docs and some duplicates counts each correctly."""
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            "writeErrors": [{"index": 1, "code": 11000, "errmsg": "E11000 duplicate key"}],
+            "nInserted": 2,
+        }
+    )
+
+    inserted, dupes = _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+    assert inserted == 2
+    assert dupes == 1
+
+
+def test_insert_batch_skipping_duplicates_reraises_non_duplicate_errors():
+    """A write error that is NOT a duplicate key (e.g. a real validation failure) must propagate."""
+    collection = MagicMock()
+    batch = [{"id": "A"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            "writeErrors": [{"index": 0, "code": 121, "errmsg": "Document failed validation"}],
+            "nInserted": 0,
+        }
+    )
+
+    with pytest.raises(BulkWriteError):
+        _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+
+def test_bulk_insert_iter_continues_past_a_duplicate_batch():
+    """
+    Verify the specific bug this fixes.
+
+    A colliding early batch must not prevent later, non-colliding batches from being attempted.
+    Two batches of size 2; batch 1 is entirely duplicates, batch 2 is entirely new.
+    """
+    collection = MagicMock()
+
+    def insert_many_side_effect(batch, ordered):
+        # First call (batch 1) collides; second call (batch 2) succeeds.
+        if insert_many_side_effect.calls == 0:
+            insert_many_side_effect.calls += 1
+            raise BulkWriteError(
+                {
+                    "writeErrors": [
+                        {"index": 0, "code": 11000, "errmsg": "dup"},
+                        {"index": 1, "code": 11000, "errmsg": "dup"},
+                    ],
+                    "nInserted": 0,
+                }
+            )
+        insert_many_side_effect.calls += 1
+
+    insert_many_side_effect.calls = 0
+    collection.insert_many.side_effect = insert_many_side_effect
+
+    docs = [{"id": "A"}, {"id": "B"}, {"id": "C"}, {"id": "D"}]
+    total, total_dupes = _bulk_insert_iter(collection, iter(docs), batch_size=2, label="classes")
+
+    # Batch 2 must have been attempted despite batch 1's collision.
+    assert collection.insert_many.call_count == 2
+    assert total == 2  # batch 2's 2 new docs
+    assert total_dupes == 2  # batch 1's 2 duplicates

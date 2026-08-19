@@ -8,6 +8,7 @@ from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from pymongo import MongoClient
+from pymongo.errors import BulkWriteError
 from tqdm import tqdm
 
 from ontology_loader.mongo_db_config import MongoDBConfig
@@ -290,9 +291,17 @@ class MongoDBLoader:
         Fast-initial mode: raw pymongo ``insert_many`` with no upsert and no reporting.
 
         Intended for first-time installs of large ontologies (e.g. NCBITaxon, 2.7M classes + 54.7M relations)
-        where pre-read + upsert overhead dominates wall-clock. Caller is asserting the target collections are
-        either empty or that duplicate-key errors are acceptable — this method does not pre-clear, does not
-        deduplicate, and does not produce TSV reports.
+        where pre-read + upsert overhead dominates wall-clock. This method does not pre-clear and does not
+        produce TSV reports. It does, however, guard against duplicate inserts: it declares a unique index on
+        ``id`` (classes) / ``(subject, predicate, object)`` (relations) before inserting, so that rerunning
+        against already-populated collections skips the documents that are already present — logged, not
+        silently duplicated — instead of either doubling the data (no index) or aborting the whole remaining
+        load on the first collision (index present but errors uncaught). See ``_bulk_insert_iter``.
+
+        These are separately-named indexes from the non-unique ones ``upsert_ontology_data`` declares on the
+        same fields, so this is purely additive: it does not touch, rebuild, or risk the meticulous path's
+        existing indexes on these shared collections, and does not require those collections to already be
+        duplicate-free for an existing index to be safely upgraded in place.
 
         :param ontology_classes: A list of OntologyClass objects to insert.
         :param ontology_relations: A list of OntologyRelation objects to insert.
@@ -300,30 +309,37 @@ class MongoDBLoader:
         :param relation_collection_name: MongoDB collection name for ontology relations.
         :param batch_size: Documents per ``insert_many`` call. Default 5000.
         """
-        logging.warning(
-            "fast-initial mode does not pre-clear or deduplicate: it raw-inserts into "
-            f"'{class_collection_name}' and '{relation_collection_name}'. Rerunning against "
-            "populated collections will raise DuplicateKeyError. Ensure these collections are empty."
-        )
-
         py_class = self._py_db[class_collection_name]
         py_relation = self._py_db[relation_collection_name]
 
-        class_count = _bulk_insert_iter(
+        # Created once, on an empty or already-indexed collection: cheap even at NCBITaxon scale.
+        # The per-document uniqueness check during insert_many is the only ongoing cost, and it is
+        # far cheaper than the meticulous path's per-item find-then-update round trip.
+        py_class.create_index("id", unique=True, name="ontology_class_fast_initial_unique_id_index")
+        py_relation.create_index(
+            [("subject", 1), ("predicate", 1), ("object", 1)],
+            unique=True,
+            name="ontology_relation_fast_initial_unique_spo_index",
+        )
+
+        class_count, class_dupes = _bulk_insert_iter(
             py_class,
             (_class_to_doc(obj) for obj in ontology_classes),
             batch_size=batch_size,
             label="classes",
         )
 
-        relation_count = _bulk_insert_iter(
+        relation_count, relation_dupes = _bulk_insert_iter(
             py_relation,
             (doc for rel in ontology_relations if (doc := _relation_to_doc(rel)) is not None),
             batch_size=batch_size,
             label="relations",
         )
 
-        logging.info(f"Finished fast-initial insert: {class_count} classes, {relation_count} relations.")
+        logging.info(
+            f"Finished fast-initial insert: {class_count} classes ({class_dupes} already present, skipped), "
+            f"{relation_count} relations ({relation_dupes} already present, skipped)."
+        )
 
 
 def _class_to_doc(obj):
@@ -354,21 +370,67 @@ def _relation_to_doc(relation):
     return relation
 
 
+_DUPLICATE_KEY_CODE = 11000
+
+
+def _insert_batch_skipping_duplicates(py_collection, batch, label):
+    """
+    Insert one batch via ``insert_many(ordered=False)``, tolerating duplicate-key rejections.
+
+    ``ordered=False`` means MongoDB attempts every document in the batch even after some fail,
+    so a duplicate-key rejection on part of a batch does not stop the rest of that batch from
+    being inserted. What it does NOT do on its own is stop pymongo from raising ``BulkWriteError``
+    for the batch as a whole — left uncaught, that exception would abort the caller's loop and
+    every subsequent batch would never even be attempted, regardless of whether they contained
+    only new, non-colliding documents. Catching it here and continuing is what makes a rerun
+    against a partially- or fully-populated collection safe instead of either silently duplicating
+    (no unique index) or dying partway through a multi-hour load (index present, error uncaught).
+
+    Any write error that is NOT a duplicate-key error is not something this method knows how to
+    recover from, so it re-raises rather than silently swallowing an unexpected failure.
+
+    :return: (inserted_count, duplicate_count) for this batch.
+    """
+    try:
+        py_collection.insert_many(batch, ordered=False)
+        return len(batch), 0
+    except BulkWriteError as bwe:
+        write_errors = bwe.details.get("writeErrors", [])
+        non_duplicate_errors = [e for e in write_errors if e.get("code") != _DUPLICATE_KEY_CODE]
+        if non_duplicate_errors:
+            logging.error(
+                f"Batch insert into {label} hit {len(non_duplicate_errors)} non-duplicate-key "
+                f"write error(s); re-raising. First: {non_duplicate_errors[0]}"
+            )
+            raise
+        duplicate_count = len(write_errors)
+        inserted_count = len(batch) - duplicate_count
+        logging.info(f"Batch insert into {label}: {inserted_count} new, {duplicate_count} already present (skipped).")
+        return inserted_count, duplicate_count
+
+
 def _bulk_insert_iter(py_collection, docs_iter, batch_size, label):
-    """Stream ``insert_many(batch, ordered=False)`` from an iterator; returns the total inserted."""
+    """
+    Stream ``insert_many(batch, ordered=False)`` from an iterator, skipping duplicates.
+
+    :return: (total_inserted, total_duplicates_skipped).
+    """
     total = 0
+    total_dupes = 0
     batch: list = []
     for doc in docs_iter:
         batch.append(doc)
         if len(batch) >= batch_size:
-            py_collection.insert_many(batch, ordered=False)
-            total += len(batch)
+            inserted, dupes = _insert_batch_skipping_duplicates(py_collection, batch, label)
+            total += inserted
+            total_dupes += dupes
             batch = []
     if batch:
-        py_collection.insert_many(batch, ordered=False)
-        total += len(batch)
-    if total == 0:
+        inserted, dupes = _insert_batch_skipping_duplicates(py_collection, batch, label)
+        total += inserted
+        total_dupes += dupes
+    if total == 0 and total_dupes == 0:
         logging.info(f"No {label} to insert.")
     else:
-        logging.info(f"Inserted {total} {label} via pymongo.insert_many.")
-    return total
+        logging.info(f"Inserted {total} {label} via pymongo.insert_many ({total_dupes} duplicates skipped).")
+    return total, total_dupes
