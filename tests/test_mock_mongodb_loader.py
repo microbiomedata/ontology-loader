@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
-from pymongo.errors import BulkWriteError
+from pymongo.errors import BulkWriteError, OperationFailure
 
 from ontology_loader.mongodb_loader import (
     MongoDBLoader,
@@ -485,3 +485,40 @@ def test_insert_batch_skipping_duplicates_uses_ninserted_not_derived_count():
 
     assert inserted == 2  # from nInserted, not (3 - 2) == 1
     assert dupes == 2  # len(writeErrors), unaffected
+
+
+def test_fast_initial_index_build_failure_raises_actionable_error(
+    mock_mongo_client, mock_ontology_classes, mock_ontology_relations
+):
+    """
+    Verify a unique-index build failing on pre-existing duplicate data raises a clear, actionable error.
+
+    A GitHub Copilot suppressed comment on
+    https://github.com/microbiomedata/ontology-loader/pull/60 correctly pointed out that the docstring's
+    claim ("does not require those collections to already be duplicate-free") was wrong:
+    `create_index(..., unique=True)` fails if the collection already contains a duplicate on that key.
+    That's now documented and wrapped with an actionable error instead of an opaque `OperationFailure`.
+    """
+    loader = MongoDBLoader(mongo_client=mock_mongo_client, db_name="test_db")
+
+    class _FakeMongoDB:
+        """A real object (not a MagicMock) so `__getitem__` is keyed by collection name, not a shared default."""
+
+        def __init__(self):
+            self._collections = {}
+
+        def __getitem__(self, name):
+            return self._collections.setdefault(name, MagicMock())
+
+    fake_db = _FakeMongoDB()
+    loader._py_client = MagicMock()
+    loader._py_client.__getitem__.return_value = fake_db  # `_py_client[db_name]` -> the same fake db every time
+
+    class_collection = fake_db["ontology_class_set"]
+    class_collection.create_index.side_effect = OperationFailure(
+        "E11000 duplicate key error collection: nmdc.ontology_class_set index: "
+        'ontology_class_fast_initial_unique_id_index dup key: { id: "NCBITaxon:1" }'
+    )
+
+    with pytest.raises(OperationFailure, match="already contains duplicate"):
+        loader.insert_ontology_data_fast_initial(mock_ontology_classes, mock_ontology_relations)

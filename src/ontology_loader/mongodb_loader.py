@@ -8,7 +8,7 @@ from linkml_runtime import SchemaView
 from linkml_store import Client
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from pymongo import MongoClient
-from pymongo.errors import BulkWriteError
+from pymongo.errors import BulkWriteError, OperationFailure
 from tqdm import tqdm
 
 from ontology_loader.mongo_db_config import MongoDBConfig
@@ -299,15 +299,22 @@ class MongoDBLoader:
         load on the first collision (index present but errors uncaught). See ``_bulk_insert_iter``.
 
         These are separately-named indexes from the non-unique ones ``upsert_ontology_data`` declares on the
-        same fields, so this is purely additive: it does not touch, rebuild, or risk the meticulous path's
-        existing indexes on these shared collections, and does not require those collections to already be
-        duplicate-free for an existing index to be safely upgraded in place.
+        same fields, so this is purely additive: it does not touch or rebuild the meticulous path's existing
+        indexes on these shared collections. It does, however, require the target collection to already be
+        duplicate-free on ``id`` / ``(subject, predicate, object)`` for the index build itself to succeed —
+        MongoDB rejects building a unique index over data that already contains a duplicate. That is not
+        expected in practice (the meticulous path naturally dedupes by upserting on the same keys, and
+        NCBITaxon — the actual production driver for this method — only ever loads into an initially-empty
+        collection), but if it happens, see the ``OperationFailure`` handling below for what is reported.
 
         :param ontology_classes: A list of OntologyClass objects to insert.
         :param ontology_relations: A list of OntologyRelation objects to insert.
         :param class_collection_name: MongoDB collection name for ontology classes.
         :param relation_collection_name: MongoDB collection name for ontology relations.
         :param batch_size: Documents per ``insert_many`` call. Default 5000.
+        :raises OperationFailure: if either index build fails because the collection already contains
+            duplicate values on the indexed key — this indicates genuinely dirty pre-existing data, not
+            something this method can safely repair automatically. Deduplicate the collection first.
         """
         py_class = self._py_db[class_collection_name]
         py_relation = self._py_db[relation_collection_name]
@@ -315,12 +322,20 @@ class MongoDBLoader:
         # Created once, on an empty or already-indexed collection: cheap even at NCBITaxon scale.
         # The per-document uniqueness check during insert_many is the only ongoing cost, and it is
         # far cheaper than the meticulous path's per-item find-then-update round trip.
-        py_class.create_index("id", unique=True, name="ontology_class_fast_initial_unique_id_index")
-        py_relation.create_index(
-            [("subject", 1), ("predicate", 1), ("object", 1)],
-            unique=True,
-            name="ontology_relation_fast_initial_unique_spo_index",
-        )
+        try:
+            py_class.create_index("id", unique=True, name="ontology_class_fast_initial_unique_id_index")
+            py_relation.create_index(
+                [("subject", 1), ("predicate", 1), ("object", 1)],
+                unique=True,
+                name="ontology_relation_fast_initial_unique_spo_index",
+            )
+        except OperationFailure as index_error:
+            raise OperationFailure(
+                f"Could not build the fast-initial unique index on '{class_collection_name}' / "
+                f"'{relation_collection_name}': {index_error}. This means the collection already contains "
+                "duplicate id or (subject, predicate, object) values from before this fix existed (see "
+                "CHANGELOG). Deduplicate the collection before retrying fast-initial."
+            ) from index_error
 
         class_count, class_dupes = _bulk_insert_iter(
             py_class,
