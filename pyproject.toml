@@ -29,13 +29,15 @@ setuptools = "<80"
 tqdm = "^4.67.3"
 
 [tool.poetry.group.dev.dependencies]
-# pytest/tox/pytest-cov are only imported from tests/ and tox.ini, never from src/, so they don't
-# belong in [tool.poetry.dependencies] -- that forces them onto every downstream install of this
-# package. Consolidated here from what used to be two separate (and looser) declarations in both
+# pytest/tox/pytest-cov are only imported from tests/ and tox.ini, never from src/, so this direct
+# declaration doesn't belong in [tool.poetry.dependencies] -- that forces it onto every downstream
+# install. Consolidated here from what used to be two separate (and looser) declarations in both
 # groups. >=9.0.3 is the actual CVE-2025-71176 fix (versions below it, including all of 8.x, are
 # vulnerable); <10.0.0 leaves room for the current 9.x line without guessing at a future major
-# version's compatibility. Now that pytest is dev-only, raising the floor here has no effect on
-# downstream installs.
+# version's compatibility. Note: pytest still reaches downstream installs transitively (the main
+# dependency prefixcommons requires pytest-logging, which requires pytest>=2.8.1) -- this pin
+# controls only the direct declaration, not that path, though it's no longer a version conflict
+# for anyone resolving pytest>=9.0.3 either way.
 pytest = ">=9.0.3,<10.0.0"
 tox = "^4.24.1"
 pytest-cov = "^7.1.0"
