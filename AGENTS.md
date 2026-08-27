@@ -10,9 +10,9 @@ updates and large-scale complex ontologies such as NCBITaxon (2.7M classes + 54.
 
 - **linkml-store** — schema-aware setup (declarative connection, idempotent collection/index creation) and per-item
 work where that's acceptable (e.g. obsolete-term handling).
-- **Raw pymongo** — used only for the bulk-upsert phase, via the lazy `MongoDBLoader._py_db` property, 
-because `linkml-store`'s `upsert` iterates per-item (`find_one` + `update_one`/`insert_one`), which is too slow for 
-large ontologies.
+- **Raw pymongo** — used only for the fast-initial bulk-insert path (`insert_ontology_data_fast_initial`, no
+upsert, no per-item find), via the lazy `MongoDBLoader._py_db` property, because `linkml-store`'s `upsert`
+iterates per-item (`find_one` + `update_one`/`insert_one`), which is too slow for large ontologies.
 
 ## Best practice
 
