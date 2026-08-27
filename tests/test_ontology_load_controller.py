@@ -111,17 +111,29 @@ def test_ontology_loader_reports(ontology_loader):
     assert insertions_report.exists(), "Insertions report was not generated"
     assert relation_insertions_report.exists(), "Relation insertions report was not generated"
 
-    # Check report file contents
+    # Check report file contents. Whether a class lands in updates.tsv or inserts.tsv depends on
+    # whether this Mongo already has it from a prior run, so check the combined total rather than
+    # assuming either file specifically holds data rows (a header-only file in one is expected;
+    # a header-only file in *both* is not, and would mean run_ontology_loader() processed
+    # nothing).
     with updates_report.open() as f:
-        lines = f.readlines()
-        assert len(lines) > 0, "Updates report is empty"
+        updates_lines = f.readlines()
+    with insertions_report.open() as f:
+        insert_lines = f.readlines()
+    assert len(updates_lines) + len(insert_lines) > 2, "Neither updates nor inserts report has any data rows"
 
     # The class-inserts file must hold only class rows, not have been overwritten by the
     # relation-inserts write (the historical bug: both used to share one filename).
-    with insertions_report.open() as f:
-        header = f.readline()
-        assert header.split("\t")[0] == "id"
-        assert "subject" not in header, "class inserts file was overwritten by the relation report"
+    insertions_header = insert_lines[0]
+    assert insertions_header.split("\t")[0] == "id"
+    assert "subject" not in insertions_header, "class inserts file was overwritten by the relation report"
+
+    # And the relation-inserts file, now that it has its own filename, must actually hold
+    # relation rows (subject/predicate/object headers) rather than just its header, or class rows.
+    with relation_insertions_report.open() as f:
+        relation_lines = f.readlines()
+    assert "subject" in relation_lines[0], "relation inserts file does not have relation headers"
+    assert len(relation_lines) > 1, "Relation inserts report has no data rows"
 
 
 @pytest.mark.skipif(
@@ -158,6 +170,10 @@ def test_ontology_loader_reports_multi_ontology_do_not_collide():
             with insertions_report.open() as f:
                 insert_rows = len(f.readlines())
             combined_row_counts[ontology] = updates_rows + insert_rows
+            assert combined_row_counts[ontology] > 2, (
+                f"{ontology}'s combined report row count ({combined_row_counts[ontology]}) is "
+                "header-only in both files; run_ontology_loader() may not have processed anything"
+            )
 
         assert combined_row_counts["envo"] != combined_row_counts["po"], (
             f"envo and po report row counts are identical ({combined_row_counts}), "
