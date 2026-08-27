@@ -529,12 +529,12 @@ def test_fast_initial_index_build_non_duplicate_failure_reraises_unchanged(
     mock_mongo_client, mock_ontology_classes, mock_ontology_relations
 ):
     """
-    A `create_index` failure that is NOT a duplicate-key error (e.g. authorization, an existing
-    same-name index with different options) must propagate unchanged, not be relabeled as dirty data.
+    A non-duplicate-key `create_index` failure must propagate unchanged, not be relabeled as dirty data.
 
-    A GitHub Copilot review comment on https://github.com/microbiomedata/ontology-loader/pull/60
-    correctly pointed out that catching every `OperationFailure` and rewriting it as "duplicate
-    data" would misdiagnose these other failure modes and discard the original code/details.
+    Authorization failures and index-option conflicts are two examples. A GitHub Copilot review
+    comment on https://github.com/microbiomedata/ontology-loader/pull/60 correctly pointed out that
+    catching every `OperationFailure` and rewriting it as "duplicate data" would misdiagnose these
+    other failure modes and discard the original code/details.
     """
     loader = MongoDBLoader(mongo_client=mock_mongo_client, db_name="test_db")
 
