@@ -276,7 +276,7 @@ class MongoDBLoader:
         return (
             Report("update", updates_report, ontology_fields),
             Report("insert", insertions_report, ontology_fields),
-            Report("insert", insertions_report_relations, ["subject", "predicate", "object"]),
+            Report("relation_insert", insertions_report_relations, ["subject", "predicate", "object"]),
         )
 
     def insert_ontology_data_fast_initial(

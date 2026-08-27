@@ -105,18 +105,64 @@ def test_ontology_loader_reports(ontology_loader):
     # Verify reports exist in the output directory
     updates_report = Path(ontology_loader.output_directory) / "ontology_updates.tsv"
     insertions_report = Path(ontology_loader.output_directory) / "ontology_inserts.tsv"
+    relation_insertions_report = Path(ontology_loader.output_directory) / "ontology_relation_inserts.tsv"
 
     assert updates_report.exists(), "Updates report was not generated"
     assert insertions_report.exists(), "Insertions report was not generated"
+    assert relation_insertions_report.exists(), "Relation insertions report was not generated"
 
     # Check report file contents
     with updates_report.open() as f:
         lines = f.readlines()
         assert len(lines) > 0, "Updates report is empty"
 
+    # The class-inserts file must hold only class rows, not have been overwritten by the
+    # relation-inserts write (the historical bug: both used to share one filename).
     with insertions_report.open() as f:
-        lines = f.readlines()
-        assert len(lines) > 0, "Insertions report is empty"
+        header = f.readline()
+        assert header.split("\t")[0] == "id"
+        assert "subject" not in header, "class inserts file was overwritten by the relation report"
+
+
+@pytest.mark.skipif(
+    os.getenv("MONGO_PASSWORD") is None or os.getenv("ENABLE_DB_TESTS") != "true",
+    reason="Skipping test: Requires MONGO_PASSWORD and ENABLE_DB_TESTS=true",
+)
+def test_ontology_loader_reports_multi_ontology_do_not_collide():
+    """
+    Loading more than one ontology in one invocation must not overwrite earlier reports.
+
+    Historical bug: report_directory was shared flat across the whole run, and each ontology's
+    write used fixed filenames, so only the last ontology's reports survived.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        loader = OntologyLoaderController(
+            source_ontology=["envo", "po"],
+            report_directory=tmp,
+        )
+        loader.run_ontology_loader()
+
+        # Whether a class lands in updates.tsv or inserts.tsv depends on whether this Mongo
+        # already has it from a prior run (fresh CI Mongo: all inserts; a reused dev Mongo: all
+        # updates), so check the combined total rather than assuming either file specifically is
+        # populated. envo (~4,366 classes) and po (~1,998 classes) differ enough that identical
+        # combined totals would mean one ontology's files got the other's content.
+        combined_row_counts = {}
+        for ontology in ("envo", "po"):
+            updates_report = Path(tmp) / ontology / "ontology_updates.tsv"
+            insertions_report = Path(tmp) / ontology / "ontology_inserts.tsv"
+            assert updates_report.exists(), f"{ontology}'s updates report is missing"
+            assert insertions_report.exists(), f"{ontology}'s inserts report is missing"
+            with updates_report.open() as f:
+                updates_rows = len(f.readlines())
+            with insertions_report.open() as f:
+                insert_rows = len(f.readlines())
+            combined_row_counts[ontology] = updates_rows + insert_rows
+
+        assert combined_row_counts["envo"] != combined_row_counts["po"], (
+            f"envo and po report row counts are identical ({combined_row_counts}), "
+            "suggesting one overwrote the other rather than each landing in its own file"
+        )
 
 
 @pytest.mark.skipif(

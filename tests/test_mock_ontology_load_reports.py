@@ -8,7 +8,39 @@ import pytest
 
 from ontology_loader.mongodb_loader import MongoDBLoader
 from ontology_loader.ontology_load_controller import OntologyLoaderController
+from ontology_loader.reporter import Report, ReportWriter
 from ontology_loader.utils import load_yaml_from_package
+
+
+def test_write_reports_class_and_relation_inserts_do_not_collide():
+    """
+    Regression test: class and relation Report objects must not write to the same file.
+
+    Both used to be constructed with report_type="insert", so both wrote to ontology_inserts.tsv
+    and the second write (relations) silently overwrote the first (classes). No mocking of
+    write_reports itself, this calls the real method with real Report objects.
+    """
+    updates = Report("update", [["ENVO:001", "Term1"]], ["id", "name"])
+    class_inserts = Report("insert", [["ENVO:002", "Term2"]], ["id", "name"])
+    relation_inserts = Report(
+        "relation_insert", [["ENVO:002", "rdfs:subClassOf", "ENVO:001"]], ["subject", "predicate", "object"]
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ReportWriter.write_reports(reports=[updates, class_inserts, relation_inserts], output_directory=tmp)
+
+        updates_path = Path(tmp) / "ontology_updates.tsv"
+        class_inserts_path = Path(tmp) / "ontology_inserts.tsv"
+        relation_inserts_path = Path(tmp) / "ontology_relation_inserts.tsv"
+
+        assert updates_path.exists()
+        assert class_inserts_path.exists()
+        assert relation_inserts_path.exists(), "relation inserts must not collide with class inserts"
+
+        # Each file holds only its own report's rows, not the other's.
+        assert "ENVO:002\tTerm2" in class_inserts_path.read_text()
+        assert "rdfs:subClassOf" not in class_inserts_path.read_text(), "class file overwritten by relation report"
+        assert "ENVO:002\trdfs:subClassOf\tENVO:001" in relation_inserts_path.read_text()
 
 
 @pytest.fixture

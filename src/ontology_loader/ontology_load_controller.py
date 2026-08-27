@@ -3,6 +3,7 @@
 import logging
 import tempfile
 import warnings
+from pathlib import Path
 
 from ontology_loader.mongodb_loader import MongoDBLoader
 from ontology_loader.ontology_processor import OntologyProcessor
@@ -192,10 +193,20 @@ class OntologyLoaderController:
                     ontology_classes_relations,
                     ontology_relations,
                 )
+                # A single source_ontology keeps the flat report_directory layout unchanged
+                # (existing callers, including nmdc-runtime's Dagster op, expect ontology_*.tsv
+                # directly in report_directory). Multiple ontologies in one invocation get their
+                # own subdirectory each, since the writer's filenames are otherwise fixed and
+                # would silently overwrite one ontology's reports with the next's.
+                report_output_directory = (
+                    self.report_directory
+                    if len(self.source_ontologies) == 1
+                    else str(Path(self.report_directory) / source_ontology)
+                )
                 ReportWriter.write_reports(
                     reports=[updates_report, insertions_report, insert_relations_report],
                     output_format="tsv",
-                    output_directory=self.report_directory,
+                    output_directory=report_output_directory,
                 )
             else:  # fast-initial
                 db_manager.insert_ontology_data_fast_initial(
