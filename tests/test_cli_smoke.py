@@ -68,9 +68,9 @@ def test_cli_unknown_option_rejected():
     assert result.returncode != 0
     combined = (result.stdout + result.stderr).lower()
     # Click error message format: "Error: No such option: --this-flag-does-not-exist"
-    assert (
-        "no such option" in combined or "this-flag-does-not-exist" in combined
-    ), f"expected Click error referencing the unknown option; got:\n{result.stdout + result.stderr}"
+    assert "no such option" in combined or "this-flag-does-not-exist" in combined, (
+        f"expected Click error referencing the unknown option; got:\n{result.stdout + result.stderr}"
+    )
 
 
 class _FakeOntologyProcessor:
