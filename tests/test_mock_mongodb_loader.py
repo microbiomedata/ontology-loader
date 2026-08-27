@@ -4,8 +4,15 @@ from unittest.mock import MagicMock
 
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
+from pymongo.errors import BulkWriteError, OperationFailure
 
-from ontology_loader.mongodb_loader import MongoDBLoader, Report, _handle_obsolete_terms
+from ontology_loader.mongodb_loader import (
+    MongoDBLoader,
+    Report,
+    _bulk_insert_iter,
+    _handle_obsolete_terms,
+    _insert_batch_skipping_duplicates,
+)
 from ontology_loader.utils import load_yaml_from_package
 
 
@@ -319,3 +326,237 @@ def test_upsert_ontology_data_with_obsolete_terms(mock_db, mock_obsolete_classes
     # The _handle_obsolete_terms function should look up each obsolete term
     for term_id in obsolete_terms:
         class_collection.find.assert_any_call({"id": term_id})
+
+
+# --- fast-initial duplicate handling ---------------------------------------------------------
+
+
+def test_insert_batch_skipping_duplicates_no_error():
+    """A batch with no collisions inserts cleanly; no duplicates reported."""
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}]
+
+    inserted, dupes = _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+    collection.insert_many.assert_called_once_with(batch, ordered=False)
+    assert inserted == 2
+    assert dupes == 0
+
+
+def test_insert_batch_skipping_duplicates_all_duplicate_key_errors():
+    """
+    A batch that is entirely duplicate-key rejections is treated as fully skipped, not re-raised.
+
+    This is the exact rerun-without-clearing scenario: every document in the batch already
+    exists, so pymongo reports one writeError per document, all code 11000.
+    """
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            "writeErrors": [
+                {"index": 0, "code": 11000, "errmsg": "E11000 duplicate key"},
+                {"index": 1, "code": 11000, "errmsg": "E11000 duplicate key"},
+                {"index": 2, "code": 11000, "errmsg": "E11000 duplicate key"},
+            ],
+            "nInserted": 0,
+        }
+    )
+
+    inserted, dupes = _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+    assert inserted == 0
+    assert dupes == 3
+
+
+def test_insert_batch_skipping_duplicates_partial_duplicates():
+    """A batch with some new docs and some duplicates counts each correctly."""
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            "writeErrors": [{"index": 1, "code": 11000, "errmsg": "E11000 duplicate key"}],
+            "nInserted": 2,
+        }
+    )
+
+    inserted, dupes = _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+    assert inserted == 2
+    assert dupes == 1
+
+
+def test_insert_batch_skipping_duplicates_reraises_non_duplicate_errors():
+    """A write error that is NOT a duplicate key (e.g. a real validation failure) must propagate."""
+    collection = MagicMock()
+    batch = [{"id": "A"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            "writeErrors": [{"index": 0, "code": 121, "errmsg": "Document failed validation"}],
+            "nInserted": 0,
+        }
+    )
+
+    with pytest.raises(BulkWriteError):
+        _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+
+def test_bulk_insert_iter_continues_past_a_duplicate_batch():
+    """
+    Verify the specific bug this fixes.
+
+    A colliding early batch must not prevent later, non-colliding batches from being attempted.
+    Two batches of size 2; batch 1 is entirely duplicates, batch 2 is entirely new.
+    """
+    collection = MagicMock()
+
+    def insert_many_side_effect(batch, ordered):
+        # First call (batch 1) collides; second call (batch 2) succeeds.
+        if insert_many_side_effect.calls == 0:
+            insert_many_side_effect.calls += 1
+            raise BulkWriteError(
+                {
+                    "writeErrors": [
+                        {"index": 0, "code": 11000, "errmsg": "dup"},
+                        {"index": 1, "code": 11000, "errmsg": "dup"},
+                    ],
+                    "nInserted": 0,
+                }
+            )
+        insert_many_side_effect.calls += 1
+
+    insert_many_side_effect.calls = 0
+    collection.insert_many.side_effect = insert_many_side_effect
+
+    docs = [{"id": "A"}, {"id": "B"}, {"id": "C"}, {"id": "D"}]
+    total, total_dupes = _bulk_insert_iter(collection, iter(docs), batch_size=2, label="classes")
+
+    # Batch 2 must have been attempted despite batch 1's collision.
+    assert collection.insert_many.call_count == 2
+    assert total == 2  # batch 2's 2 new docs
+    assert total_dupes == 2  # batch 1's 2 duplicates
+
+
+def test_insert_batch_skipping_duplicates_reraises_write_concern_errors():
+    """
+    Verify a write-concern failure propagates instead of being treated as a successful batch.
+
+    writeConcernErrors carry no writeErrors of their own, so a batch with a write-concern failure
+    (e.g. replication timeout) and zero duplicate-key writeErrors must not be mistaken for "all
+    inserted, zero duplicates."
+    """
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            "writeErrors": [],
+            "writeConcernErrors": [{"code": 64, "errmsg": "waiting for replication timed out"}],
+            "nInserted": 2,
+        }
+    )
+
+    with pytest.raises(BulkWriteError):
+        _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+
+def test_insert_batch_skipping_duplicates_uses_ninserted_not_derived_count():
+    """
+    Inserted/duplicate counts must come from nInserted, not len(batch) - len(writeErrors).
+
+    A batch where nInserted disagrees with the naive derived count (more writeErrors reported
+    than documents actually failed to insert, e.g. a retried write counted twice) must trust
+    nInserted rather than the arithmetic.
+    """
+    collection = MagicMock()
+    batch = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    collection.insert_many.side_effect = BulkWriteError(
+        {
+            # 2 writeErrors would naively imply 1 inserted (3 - 2), but nInserted says 2.
+            "writeErrors": [
+                {"index": 0, "code": 11000, "errmsg": "dup"},
+                {"index": 1, "code": 11000, "errmsg": "dup"},
+            ],
+            "writeConcernErrors": [],
+            "nInserted": 2,
+        }
+    )
+
+    inserted, dupes = _insert_batch_skipping_duplicates(collection, batch, "classes")
+
+    assert inserted == 2  # from nInserted, not (3 - 2) == 1
+    assert dupes == 2  # len(writeErrors), unaffected
+
+
+def test_fast_initial_index_build_failure_raises_actionable_error(
+    mock_mongo_client, mock_ontology_classes, mock_ontology_relations
+):
+    """
+    Verify a unique-index build failing on pre-existing duplicate data raises a clear, actionable error.
+
+    A GitHub Copilot suppressed comment on
+    https://github.com/microbiomedata/ontology-loader/pull/60 correctly pointed out that the docstring's
+    claim ("does not require those collections to already be duplicate-free") was wrong:
+    `create_index(..., unique=True)` fails if the collection already contains a duplicate on that key.
+    That's now documented and wrapped with an actionable error instead of an opaque `OperationFailure`.
+    """
+    loader = MongoDBLoader(mongo_client=mock_mongo_client, db_name="test_db")
+
+    class _FakeMongoDB:
+        """A real object (not a MagicMock) so `__getitem__` is keyed by collection name, not a shared default."""
+
+        def __init__(self):
+            self._collections = {}
+
+        def __getitem__(self, name):
+            return self._collections.setdefault(name, MagicMock())
+
+    fake_db = _FakeMongoDB()
+    loader._py_client = MagicMock()
+    loader._py_client.__getitem__.return_value = fake_db  # `_py_client[db_name]` -> the same fake db every time
+
+    class_collection = fake_db["ontology_class_set"]
+    class_collection.create_index.side_effect = OperationFailure(
+        "E11000 duplicate key error collection: nmdc.ontology_class_set index: "
+        'ontology_class_fast_initial_unique_id_index dup key: { id: "NCBITaxon:1" }',
+        code=11000,
+    )
+
+    with pytest.raises(OperationFailure, match="already contains duplicate"):
+        loader.insert_ontology_data_fast_initial(mock_ontology_classes, mock_ontology_relations)
+
+
+def test_fast_initial_index_build_non_duplicate_failure_reraises_unchanged(
+    mock_mongo_client, mock_ontology_classes, mock_ontology_relations
+):
+    """
+    A non-duplicate-key `create_index` failure must propagate unchanged, not be relabeled as dirty data.
+
+    Authorization failures and index-option conflicts are two examples. A GitHub Copilot review
+    comment on https://github.com/microbiomedata/ontology-loader/pull/60 correctly pointed out that
+    catching every `OperationFailure` and rewriting it as "duplicate data" would misdiagnose these
+    other failure modes and discard the original code/details.
+    """
+    loader = MongoDBLoader(mongo_client=mock_mongo_client, db_name="test_db")
+
+    class _FakeMongoDB:
+        def __init__(self):
+            self._collections = {}
+
+        def __getitem__(self, name):
+            return self._collections.setdefault(name, MagicMock())
+
+    fake_db = _FakeMongoDB()
+    loader._py_client = MagicMock()
+    loader._py_client.__getitem__.return_value = fake_db
+
+    class_collection = fake_db["ontology_class_set"]
+    original_error = OperationFailure("not authorized on nmdc to execute command", code=13)
+    class_collection.create_index.side_effect = original_error
+
+    with pytest.raises(OperationFailure) as exc_info:
+        loader.insert_ontology_data_fast_initial(mock_ontology_classes, mock_ontology_relations)
+
+    # The original exception itself, not a rewritten one: code and message both preserved.
+    assert exc_info.value is original_error
+    assert exc_info.value.code == 13
+    assert "already contains duplicate" not in str(exc_info.value)
