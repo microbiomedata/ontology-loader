@@ -1,1 +1,1 @@
-See [AGENTS.md](AGENTS.md) for project overview, conventions, build/test instructions, and release process.
+See [AGENTS.md](AGENTS.md) for project overview, conventions, and build/test instructions.
