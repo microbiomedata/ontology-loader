@@ -65,6 +65,13 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - uses: ts-graphviz/setup-graphviz@b1de5da23ed0a6d14e0aeee8ed52fdd87af2363c # v2.0.2
+        with:
+          # `apt-get update` against the runner's default Ubuntu mirrors is a known cause of
+          # this action hanging (upstream: ts-graphviz/setup-graphviz#652, open, unresolved).
+          # GitHub's ubuntu-latest images refresh their apt index regularly, so skipping the
+          # update and installing straight from the image's existing cache is safe here — this
+          # workflow does not pin a specific graphviz version that would need a fresher index.
+          ubuntu-skip-apt-update: true
 
       - name: Install Poetry
         run: pipx install poetry
