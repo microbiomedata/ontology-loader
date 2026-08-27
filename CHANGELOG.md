@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+- **`mode='fast-initial'` silently duplicated data on rerun instead of raising `DuplicateKeyError` as documented.** Released in 0.2.3 with no unique index on either target collection, so `insert_many` had nothing to detect a duplicate against: rerunning a `fast-initial` load against an already-populated `ontology_class_set`/`ontology_relation_set` doubled every class and relation with no error, no warning beyond a log line, and no indication in the run's final status. Reproduced directly: a 12,000-class/11,999-relation load, rerun without clearing, doubled to 24,000/23,998 before this fix; after, counts are unchanged on rerun and the underlying unique index rejects direct duplicate inserts with a real `DuplicateKeyError`.
+  - `insert_ontology_data_fast_initial` now declares a unique index on `id` (classes) and `(subject, predicate, object)` (relations) before inserting — separately named from the non-unique indexes `upsert_ontology_data` declares on the same fields, so this is purely additive and does not touch, rebuild, or risk the meticulous path's existing indexes on these shared collections.
+  - `_bulk_insert_iter` now catches `BulkWriteError` per batch: genuine duplicate-key rejections (code `11000`) are logged and skipped, and the loop continues to the next batch — a rerun is now idempotent instead of either silently duplicating (no index) or aborting every batch after the first collision (index alone, without this). Any non-duplicate-key write error still propagates; it is not something this method can safely recover from.
+
 ### Added
 - `OntologyLoaderController(mode=...)` kwarg accepting `'meticulous'` (default) or `'fast-initial'`.
   - `meticulous` preserves 0.2.x behavior exactly: pure linkml-store, per-item upsert, force-refresh of the pystow cache, TSV reports written to `report_directory`.
