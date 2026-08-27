@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from pymongo import MongoClient
 
 from ontology_loader.mongodb_loader import MongoDBLoader, _handle_obsolete_terms
 from ontology_loader.ontology_load_controller import OntologyLoaderController
@@ -147,38 +148,70 @@ def test_ontology_loader_reports_multi_ontology_do_not_collide():
     Historical bug: report_directory was shared flat across the whole run, and each ontology's
     write used fixed filenames, so only the last ontology's reports survived.
     """
-    with tempfile.TemporaryDirectory() as tmp:
-        loader = OntologyLoaderController(
-            source_ontology=["envo", "po"],
-            report_directory=tmp,
-        )
-        loader.run_ontology_loader()
+    host = os.environ.get("MONGO_HOST", "localhost")
+    port = int(os.environ.get("MONGO_PORT", "27017"))
+    user = os.environ["MONGO_USERNAME"] if "MONGO_USERNAME" in os.environ else "admin"
+    pw = os.environ["MONGO_PASSWORD"]
+    db_name = "ontology_loader_multi_ontology_test"
 
-        # Whether a class lands in updates.tsv or inserts.tsv depends on whether this Mongo
-        # already has it from a prior run (fresh CI Mongo: all inserts; a reused dev Mongo: all
-        # updates), so check the combined total rather than assuming either file specifically is
-        # populated. envo (~4,366 classes) and po (~1,998 classes) differ enough that identical
-        # combined totals would mean one ontology's files got the other's content.
-        combined_row_counts = {}
-        for ontology in ("envo", "po"):
-            updates_report = Path(tmp) / ontology / "ontology_updates.tsv"
-            insertions_report = Path(tmp) / ontology / "ontology_inserts.tsv"
-            assert updates_report.exists(), f"{ontology}'s updates report is missing"
-            assert insertions_report.exists(), f"{ontology}'s inserts report is missing"
-            with updates_report.open() as f:
-                updates_rows = len(f.readlines())
-            with insertions_report.open() as f:
-                insert_rows = len(f.readlines())
-            combined_row_counts[ontology] = updates_rows + insert_rows
-            assert combined_row_counts[ontology] > 2, (
-                f"{ontology}'s combined report row count ({combined_row_counts[ontology]}) is "
-                "header-only in both files; run_ontology_loader() may not have processed anything"
+    client = MongoClient(
+        host=host,
+        port=port,
+        username=user,
+        password=pw,
+        authSource="admin",
+        directConnection=True,
+    )
+
+    # Same scratch-database safety pattern as test_cli_smoke.py's live-Mongo test: refuse to run
+    # against a leftover database from a previous failed run rather than silently reusing it.
+    if db_name in client.list_database_names():
+        pytest.fail(
+            f"scratch database {db_name!r} already exists on the target MongoDB "
+            f"({host}:{port}). Refusing to run to avoid overwriting it. "
+            f"Investigate, then drop it explicitly to re-enable this test."
+        )
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            loader = OntologyLoaderController(
+                source_ontology=["envo", "po"],
+                report_directory=tmp,
+                mongo_client=client,
+                db_name=db_name,
             )
+            loader.run_ontology_loader()
 
-        assert combined_row_counts["envo"] != combined_row_counts["po"], (
-            f"envo and po report row counts are identical ({combined_row_counts}), "
-            "suggesting one overwrote the other rather than each landing in its own file"
-        )
+            # Whether a class lands in updates.tsv or inserts.tsv depends on whether this Mongo
+            # already has it from a prior run (fresh CI Mongo: all inserts; a reused dev Mongo:
+            # all updates), so check the combined total rather than assuming either file
+            # specifically is populated. envo (~4,366 classes) and po (~1,998 classes) differ
+            # enough that identical combined totals would mean one ontology's files got the
+            # other's content.
+            combined_row_counts = {}
+            for ontology in ("envo", "po"):
+                updates_report = Path(tmp) / ontology / "ontology_updates.tsv"
+                insertions_report = Path(tmp) / ontology / "ontology_inserts.tsv"
+                assert updates_report.exists(), f"{ontology}'s updates report is missing"
+                assert insertions_report.exists(), f"{ontology}'s inserts report is missing"
+                with updates_report.open() as f:
+                    updates_rows = len(f.readlines())
+                with insertions_report.open() as f:
+                    insert_rows = len(f.readlines())
+                combined_row_counts[ontology] = updates_rows + insert_rows
+                assert combined_row_counts[ontology] > 2, (
+                    f"{ontology}'s combined report row count ({combined_row_counts[ontology]}) is "
+                    "header-only in both files; run_ontology_loader() may not have processed anything"
+                )
+
+            assert combined_row_counts["envo"] != combined_row_counts["po"], (
+                f"envo and po report row counts are identical ({combined_row_counts}), "
+                "suggesting one overwrote the other rather than each landing in its own file"
+            )
+    finally:
+        # Clean up unconditionally so reruns are deterministic and the dev's MongoDB doesn't
+        # accumulate test leftovers across runs.
+        client.drop_database(db_name)
 
 
 @pytest.mark.skipif(
