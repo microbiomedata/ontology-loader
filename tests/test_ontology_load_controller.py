@@ -39,6 +39,12 @@ def scratch_mongo(request):
     :return: (MongoClient, db_name) for the caller to pass through as
         OntologyLoaderController(mongo_client=..., db_name=...) or MongoDBLoader(mongo_client=..., db_name=...).
     """
+    # Self-gate rather than let a bare os.environ["MONGO_PASSWORD"] raise KeyError: any future
+    # test using this fixture without the live-DB skipif marker (or a DB-less CI run) should skip
+    # gracefully, not error during fixture setup.
+    if os.getenv("MONGO_PASSWORD") is None or os.getenv("ENABLE_DB_TESTS") != "true":
+        pytest.skip("Skipping test: Requires MONGO_PASSWORD and ENABLE_DB_TESTS=true")
+
     host = os.environ.get("MONGO_HOST", "localhost")
     port = int(os.environ.get("MONGO_PORT", "27017"))
     user = os.environ["MONGO_USERNAME"] if "MONGO_USERNAME" in os.environ else "admin"
@@ -55,16 +61,19 @@ def scratch_mongo(request):
         authSource="admin",
         directConnection=True,
     )
-    if db_name in client.list_database_names():
-        pytest.fail(
-            f"scratch database {db_name!r} already exists on the target MongoDB "
-            f"({host}:{port}). Refusing to run to avoid overwriting it. "
-            f"Investigate, then drop it explicitly to re-enable this test."
-        )
+    try:
+        if db_name in client.list_database_names():
+            pytest.fail(
+                f"scratch database {db_name!r} already exists on the target MongoDB "
+                f"({host}:{port}). Refusing to run to avoid overwriting it. "
+                f"Investigate, then drop it explicitly to re-enable this test."
+            )
 
-    yield client, db_name
+        yield client, db_name
 
-    client.drop_database(db_name)
+        client.drop_database(db_name)
+    finally:
+        client.close()
 
 
 @pytest.fixture
