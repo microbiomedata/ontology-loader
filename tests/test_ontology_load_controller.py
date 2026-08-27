@@ -1,5 +1,6 @@
 """Test the OntologyLoader class."""
 
+import csv
 import os
 import tempfile
 from pathlib import Path
@@ -62,6 +63,19 @@ def ontology_loader_with_client(mock_mongo_client):
     )
 
 
+def test_ontology_loader_rejects_duplicate_source_ontology():
+    """
+    A repeated ontology name in source_ontology must raise, not silently collide.
+
+    Each ontology in a multi-ontology run gets a report subdirectory named after it (see
+    run_ontology_loader's report_output_directory); ["envo", "envo"] would resolve both
+    iterations to the same subdirectory, and the second run's reports would overwrite the
+    first's. No MongoDB connection needed: this raises in __init__, before any DB access.
+    """
+    with pytest.raises(ValueError, match="duplicates"):
+        OntologyLoaderController(source_ontology=["envo", "po", "envo"])
+
+
 @pytest.mark.skipif(
     os.getenv("MONGO_PASSWORD") is None or os.getenv("ENABLE_DB_TESTS") != "true",
     reason="Skipping test: Requires MONGO_PASSWORD and ENABLE_DB_TESTS=true",
@@ -112,29 +126,47 @@ def test_ontology_loader_reports(ontology_loader):
     assert insertions_report.exists(), "Insertions report was not generated"
     assert relation_insertions_report.exists(), "Relation insertions report was not generated"
 
-    # Check report file contents. Whether a class lands in updates.tsv or inserts.tsv depends on
-    # whether this Mongo already has it from a prior run, so check the combined total rather than
-    # assuming either file specifically holds data rows (a header-only file in one is expected;
-    # a header-only file in *both* is not, and would mean run_ontology_loader() processed
-    # nothing).
-    with updates_report.open() as f:
-        updates_lines = f.readlines()
-    with insertions_report.open() as f:
-        insert_lines = f.readlines()
-    assert len(updates_lines) + len(insert_lines) > 2, "Neither updates nor inserts report has any data rows"
+    # Parse with csv.reader, not readlines()+split("\t"): a class's `relations` field can embed a
+    # literal newline inside a quoted TSV field, which readlines() would wrongly split into
+    # multiple "rows".
+    def _read_tsv_rows(path):
+        with path.open(newline="") as f:
+            return list(csv.reader(f, delimiter="\t"))
+
+    updates_rows = _read_tsv_rows(updates_report)
+    insert_rows = _read_tsv_rows(insertions_report)
+    relation_rows = _read_tsv_rows(relation_insertions_report)
+
+    # Whether a class lands in updates.tsv or inserts.tsv depends on whether this Mongo already
+    # has it from a prior run, so check the combined total rather than assuming either file
+    # specifically holds data rows (a header-only file in one is expected; a header-only file in
+    # *both* is not, and would mean run_ontology_loader() processed nothing).
+    assert len(updates_rows) + len(insert_rows) > 2, "Neither updates nor inserts report has any data rows"
 
     # The class-inserts file must hold only class rows, not have been overwritten by the
     # relation-inserts write (the historical bug: both used to share one filename).
-    insertions_header = insert_lines[0]
-    assert insertions_header.split("\t")[0] == "id"
+    insertions_header = insert_rows[0]
+    assert insertions_header[0] == "id"
     assert "subject" not in insertions_header, "class inserts file was overwritten by the relation report"
 
     # And the relation-inserts file, now that it has its own filename, must actually hold
     # relation rows (subject/predicate/object headers) rather than just its header, or class rows.
-    with relation_insertions_report.open() as f:
-        relation_lines = f.readlines()
-    assert "subject" in relation_lines[0], "relation inserts file does not have relation headers"
-    assert len(relation_lines) > 1, "Relation inserts report has no data rows"
+    assert "subject" in relation_rows[0], "relation inserts file does not have relation headers"
+    assert len(relation_rows) > 1, "Relation inserts report has no data rows"
+
+    # Every data row must have the same column count as its header: catches the report writer
+    # silently emitting a mismatched header (e.g. write_reports prepending an "id" column a
+    # report's records don't actually have, as it used to for the relation report).
+    for label, rows in (
+        ("updates", updates_rows),
+        ("inserts", insert_rows),
+        ("relation inserts", relation_rows),
+    ):
+        header_columns = len(rows[0])
+        for row in rows[1:]:
+            assert len(row) == header_columns, (
+                f"{label} report: data row column count doesn't match its header ({header_columns} columns): {row!r}"
+            )
 
 
 @pytest.mark.skipif(
@@ -194,15 +226,29 @@ def test_ontology_loader_reports_multi_ontology_do_not_collide():
                 insertions_report = Path(tmp) / ontology / "ontology_inserts.tsv"
                 assert updates_report.exists(), f"{ontology}'s updates report is missing"
                 assert insertions_report.exists(), f"{ontology}'s inserts report is missing"
-                with updates_report.open() as f:
-                    updates_rows = len(f.readlines())
-                with insertions_report.open() as f:
-                    insert_rows = len(f.readlines())
-                combined_row_counts[ontology] = updates_rows + insert_rows
+
+                # csv.reader, not readlines()+split("\t"): a class's `relations` field can embed a
+                # literal newline inside a quoted TSV field, which readlines() would wrongly split
+                # into multiple "rows".
+                with updates_report.open(newline="") as f:
+                    updates_rows = list(csv.reader(f, delimiter="\t"))
+                with insertions_report.open(newline="") as f:
+                    insert_rows = list(csv.reader(f, delimiter="\t"))
+                combined_row_counts[ontology] = len(updates_rows) + len(insert_rows)
                 assert combined_row_counts[ontology] > 2, (
                     f"{ontology}'s combined report row count ({combined_row_counts[ontology]}) is "
                     "header-only in both files; run_ontology_loader() may not have processed anything"
                 )
+
+                # Every data row must have the same column count as its header: catches a
+                # mismatched report header/record shape, not just a missing file.
+                for label, rows in (("updates", updates_rows), ("inserts", insert_rows)):
+                    header_columns = len(rows[0])
+                    for row in rows[1:]:
+                        assert len(row) == header_columns, (
+                            f"{ontology} {label} report: data row column count doesn't match its "
+                            f"header ({header_columns} columns): {row!r}"
+                        )
 
             assert combined_row_counts["envo"] != combined_row_counts["po"], (
                 f"envo and po report row counts are identical ({combined_row_counts}), "

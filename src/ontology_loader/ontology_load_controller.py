@@ -136,6 +136,15 @@ class OntologyLoaderController:
             self.source_ontologies = list(source_ontology)
         if not self.source_ontologies:
             raise ValueError("source_ontology must include at least one ontology name.")
+        duplicates = {name for name in self.source_ontologies if self.source_ontologies.count(name) > 1}
+        if duplicates:
+            # Each ontology in a multi-ontology run gets a report subdirectory named after it
+            # (see run_ontology_loader's report_output_directory); a repeated name would make a
+            # later run silently overwrite an earlier one's reports in that same subdirectory.
+            raise ValueError(
+                f"source_ontology must not contain duplicates; got repeated name(s): "
+                f"{sorted(duplicates)} in {self.source_ontologies}."
+            )
 
         self.report_directory = (
             report_directory if report_directory is not None else tempfile.mkdtemp(prefix="ontology_loader_reports_")

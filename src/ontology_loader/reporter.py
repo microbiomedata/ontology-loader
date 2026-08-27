@@ -19,7 +19,9 @@ class Report:
 
         :param report_type: The type of report (e.g., "insertions", "updates")
         :param records: A list of records to include in the report
-        :param headers: A list of headers to include in the report
+        :param headers: The full header row, one entry per column in ``records``. write_reports
+            writes this as-is (it does not prepend anything, e.g. an "id" column), so it must
+            match each record's column count exactly.
         """
         self.report_type = report_type
         self.records = records
@@ -55,6 +57,6 @@ class ReportWriter:
             file_path = output_directory / f"ontology_{report.report_type}s.{output_format}"
             with file_path.open(mode="w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f, delimiter="\t") if output_format == "tsv" else csv.writer(f)
-                writer.writerow(["id"] + report.headers)
+                writer.writerow(report.headers)
                 writer.writerows(report.records)
             logging.info(f"Report generated: {file_path}")

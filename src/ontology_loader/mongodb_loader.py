@@ -274,8 +274,8 @@ class MongoDBLoader:
             f"Finished upserting ontology data: {len(ontology_classes)} classes, {len(ontology_relations)} relations."
         )
         return (
-            Report("update", updates_report, ontology_fields),
-            Report("insert", insertions_report, ontology_fields),
+            Report("update", updates_report, ["id"] + ontology_fields),
+            Report("insert", insertions_report, ["id"] + ontology_fields),
             Report("relation_insert", insertions_report_relations, ["subject", "predicate", "object"]),
         )
 

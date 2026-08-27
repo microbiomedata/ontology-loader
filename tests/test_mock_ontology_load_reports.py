@@ -42,6 +42,14 @@ def test_write_reports_class_and_relation_inserts_do_not_collide():
         assert "rdfs:subClassOf" not in class_inserts_path.read_text(), "class file overwritten by relation report"
         assert "ENVO:002\trdfs:subClassOf\tENVO:001" in relation_inserts_path.read_text()
 
+        # write_reports writes headers exactly as given (no implicit "id" prepending), so each
+        # file's header must have the same column count as its data rows. Regression coverage for
+        # the bug where relation_insert's ["subject", "predicate", "object"] header got an
+        # unwanted "id" prepended, producing a 4-column header over 3-column data rows.
+        relation_lines = relation_inserts_path.read_text().splitlines()
+        assert relation_lines[0] == "subject\tpredicate\tobject"
+        assert relation_lines[1] == "ENVO:002\trdfs:subClassOf\tENVO:001"
+
 
 @pytest.fixture
 def schema_view():
