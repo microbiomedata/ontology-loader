@@ -517,8 +517,46 @@ def test_fast_initial_index_build_failure_raises_actionable_error(
     class_collection = fake_db["ontology_class_set"]
     class_collection.create_index.side_effect = OperationFailure(
         "E11000 duplicate key error collection: nmdc.ontology_class_set index: "
-        'ontology_class_fast_initial_unique_id_index dup key: { id: "NCBITaxon:1" }'
+        'ontology_class_fast_initial_unique_id_index dup key: { id: "NCBITaxon:1" }',
+        code=11000,
     )
 
     with pytest.raises(OperationFailure, match="already contains duplicate"):
         loader.insert_ontology_data_fast_initial(mock_ontology_classes, mock_ontology_relations)
+
+
+def test_fast_initial_index_build_non_duplicate_failure_reraises_unchanged(
+    mock_mongo_client, mock_ontology_classes, mock_ontology_relations
+):
+    """
+    A `create_index` failure that is NOT a duplicate-key error (e.g. authorization, an existing
+    same-name index with different options) must propagate unchanged, not be relabeled as dirty data.
+
+    A GitHub Copilot review comment on https://github.com/microbiomedata/ontology-loader/pull/60
+    correctly pointed out that catching every `OperationFailure` and rewriting it as "duplicate
+    data" would misdiagnose these other failure modes and discard the original code/details.
+    """
+    loader = MongoDBLoader(mongo_client=mock_mongo_client, db_name="test_db")
+
+    class _FakeMongoDB:
+        def __init__(self):
+            self._collections = {}
+
+        def __getitem__(self, name):
+            return self._collections.setdefault(name, MagicMock())
+
+    fake_db = _FakeMongoDB()
+    loader._py_client = MagicMock()
+    loader._py_client.__getitem__.return_value = fake_db
+
+    class_collection = fake_db["ontology_class_set"]
+    original_error = OperationFailure("not authorized on nmdc to execute command", code=13)
+    class_collection.create_index.side_effect = original_error
+
+    with pytest.raises(OperationFailure) as exc_info:
+        loader.insert_ontology_data_fast_initial(mock_ontology_classes, mock_ontology_relations)
+
+    # The original exception itself, not a rewritten one: code and message both preserved.
+    assert exc_info.value is original_error
+    assert exc_info.value.code == 13
+    assert "already contains duplicate" not in str(exc_info.value)

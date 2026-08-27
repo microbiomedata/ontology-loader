@@ -93,7 +93,7 @@ Four flags:
 ##### Modes
 
 - **`meticulous`** (default): Preserves 0.2.x behavior — pure linkml-store, per-item upsert, force-refresh of the pystow cache on every run, TSV reports (`ontology_updates.tsv`, `ontology_inserts.tsv`, `ontology_relation_inserts.tsv`) written to `--report-directory`. Use this for incremental updates of an already-loaded ontology.
-- **`fast-initial`**: Maximum-throughput first-time install. Raw pymongo `insert_many(ordered=False)`, no upsert, no pre-read, no report tracking, no TSV writes. Reuses the pystow cache if present (downloads only when missing). Use this when the target collections are empty or duplicate-key errors are acceptable. Expected ~3-5x faster than `meticulous` on large ontologies (e.g. NCBITaxon's 2.7M classes + 54.7M relations).
+- **`fast-initial`**: Maximum-throughput first-time install. Raw pymongo `insert_many(ordered=False)`, no upsert, no pre-read, no report tracking, no TSV writes. Reuses the pystow cache if present (downloads only when missing). Reruns against an already-populated collection skip documents that already exist (logged, not duplicated) rather than failing, so this is safe to retry. The one prerequisite: the target collection must already be free of duplicate `id` / `(subject, predicate, object)` values, since a genuinely dirty collection fails the one-time unique-index build this mode relies on. Expected ~3-5x faster than `meticulous` on large ontologies (e.g. NCBITaxon's 2.7M classes + 54.7M relations).
 
 ##### Closure shorthands
 

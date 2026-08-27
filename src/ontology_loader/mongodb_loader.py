@@ -330,6 +330,11 @@ class MongoDBLoader:
                 name="ontology_relation_fast_initial_unique_spo_index",
             )
         except OperationFailure as index_error:
+            if index_error.code != _DUPLICATE_KEY_CODE:
+                # Authorization failures, index-option conflicts, and other server errors are not
+                # evidence of dirty data. Re-raise unchanged so the real cause (and its original
+                # code/details) reaches the operator, instead of a misleading dedupe instruction.
+                raise
             raise OperationFailure(
                 f"Could not build the fast-initial unique index on '{class_collection_name}' / "
                 f"'{relation_collection_name}': {index_error}. This means the collection already contains "

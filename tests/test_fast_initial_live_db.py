@@ -5,6 +5,7 @@ import os
 import pytest
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
 from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
 
 from ontology_loader.mongodb_loader import MongoDBLoader
 
@@ -101,6 +102,11 @@ def test_fast_initial_rerun_without_clearing_does_not_duplicate(live_mongo_clien
         n_rel_1 = db["ontology_relation_set"].count_documents({})
         assert n_classes_1 == 50
         assert n_rel_1 == 49
+
+        # The unique index built above rejects a direct duplicate insert with the real server
+        # exception, distinct from insert_ontology_data_fast_initial's own duplicate-skipping.
+        with pytest.raises(DuplicateKeyError):
+            db["ontology_class_set"].insert_one({"id": "TEST:0000", "type": "nmdc:OntologyClass"})
 
         # Rerun WITHOUT clearing: the exact retry-after-apparent-failure scenario.
         fresh_loader().insert_ontology_data_fast_initial(classes, relations)
