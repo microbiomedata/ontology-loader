@@ -599,3 +599,47 @@ def test_fast_initial_tolerates_pre_existing_differently_named_unique_index(
     # The pre-existing index already satisfies uniqueness: no redundant, differently-named index
     # should be created. That create_index call is exactly what MongoDB rejects on prod today.
     class_collection.create_index.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "flaw_key,flaw_value",
+    [
+        ("sparse", True),
+        ("partialFilterExpression", {"is_obsolete": {"$exists": False}}),
+    ],
+)
+def test_fast_initial_refuses_to_reuse_a_sparse_or_partial_unique_index(
+    flaw_key, flaw_value, mock_mongo_client, mock_ontology_classes, mock_ontology_relations
+):
+    """
+    A sparse or partial unique index reports `unique: true` but does not cover every document.
+
+    A sparse unique index admits unlimited documents missing the field entirely, and a partial
+    unique index admits unlimited duplicates outside its filter. Verified empirically against a
+    real MongoDB: both shapes accept a second document a plain unique index rejects with a
+    duplicate-key error. Reusing either here would silently weaken fast-initial's uniqueness
+    guarantee with no error at all, so this must raise instead.
+    """
+    loader = MongoDBLoader(mongo_client=mock_mongo_client, db_name="test_db")
+
+    class _FakeMongoDB:
+        def __init__(self):
+            self._collections = {}
+
+        def __getitem__(self, name):
+            return self._collections.setdefault(name, MagicMock())
+
+    fake_db = _FakeMongoDB()
+    loader._py_client = MagicMock()
+    loader._py_client.__getitem__.return_value = fake_db
+
+    class_collection = fake_db["ontology_class_set"]
+    class_collection.list_indexes.return_value = [
+        {"key": {"_id": 1}, "name": "_id_"},
+        {"key": {"id": 1}, "name": "id_1", "unique": True, flaw_key: flaw_value},
+    ]
+
+    with pytest.raises(OperationFailure, match="does not enforce uniqueness"):
+        loader.insert_ontology_data_fast_initial(mock_ontology_classes, mock_ontology_relations)
+
+    class_collection.create_index.assert_not_called()

@@ -291,14 +291,34 @@ class MongoDBLoader:
         creating this method's own differently-named index would otherwise crash on the very first
         fast-initial run against prod, before loading anything. See
         https://github.com/microbiomedata/ontology-loader/issues/68.
+
+        A ``unique`` index is only reused when it is unique over every document, not just some of
+        them: ``sparse`` and ``partialFilterExpression`` both report ``unique: true`` while
+        admitting duplicates outside their own scope (a sparse unique index allows unlimited
+        documents that lack the field entirely; a partial unique index allows unlimited duplicates
+        outside its filter). Verified empirically against a real MongoDB: both shapes accept a
+        second document a plain unique index rejects with a duplicate-key error. Confirmed prod's
+        actual ``id_1`` index is plain (no ``sparse``, no ``partialFilterExpression``) as of
+        2026-08-28, so this was a latent gap, not a live one -- but reusing either shape here would
+        have silently weakened fast-initial's uniqueness guarantee on ``id`` with no error at all.
         """
         for existing in collection.list_indexes():
-            if list(existing["key"].items()) == keys and existing.get("unique"):
-                logging.info(
-                    f"Fast-initial: an index on {keys} already exists as '{existing['name']}' and is "
-                    f"already unique; not creating '{name}' alongside it."
+            if list(existing["key"].items()) != keys or not existing.get("unique"):
+                continue
+            if existing.get("sparse") or existing.get("partialFilterExpression"):
+                raise OperationFailure(
+                    f"A unique index on {keys} already exists as '{existing['name']}', but it is "
+                    f"{'sparse' if existing.get('sparse') else 'a partial index'} and does not "
+                    f"enforce uniqueness over every document. Cannot safely reuse it for "
+                    f"'{name}', and MongoDB refuses to create a second index on the same key "
+                    "under a different name. Drop or replace the existing index with a plain "
+                    "unique index before retrying fast-initial."
                 )
-                return
+            logging.info(
+                f"Fast-initial: an index on {keys} already exists as '{existing['name']}' and is "
+                f"already unique; not creating '{name}' alongside it."
+            )
+            return
         collection.create_index(keys, unique=True, name=name)
 
     def insert_ontology_data_fast_initial(
