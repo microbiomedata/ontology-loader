@@ -25,15 +25,70 @@ def schema_view():
 
 
 @pytest.fixture
-def ontology_loader():
+def scratch_mongo(request):
     """
-    Initialize the OntologyLoader with test parameters.
+    Provide a dedicated scratch MongoDB database for one test, cleaned up unconditionally afterward.
+
+    Same pattern as test_cli_smoke.py's live-Mongo test and this file's own
+    test_ontology_loader_reports_multi_ontology_do_not_collide: refuse to run if a database with
+    this scratch name already exists (a leftover from a previous failed run), and drop it in a
+    teardown that runs regardless of whether the test passed, failed, or errored. Named after the
+    requesting test so concurrent/successive scratch databases in this file never collide with
+    each other.
+
+    :return: (MongoClient, db_name) for the caller to pass through as
+        OntologyLoaderController(mongo_client=..., db_name=...) or MongoDBLoader(mongo_client=..., db_name=...).
+    """
+    # Self-gate rather than let a bare os.environ["MONGO_PASSWORD"] raise KeyError: any future
+    # test using this fixture without the live-DB skipif marker (or a DB-less CI run) should skip
+    # gracefully, not error during fixture setup.
+    if os.getenv("MONGO_PASSWORD") is None or os.getenv("ENABLE_DB_TESTS") != "true":
+        pytest.skip("Skipping test: Requires MONGO_PASSWORD and ENABLE_DB_TESTS=true")
+
+    host = os.environ.get("MONGO_HOST", "localhost")
+    port = int(os.environ.get("MONGO_PORT", "27017"))
+    user = os.environ["MONGO_USERNAME"] if "MONGO_USERNAME" in os.environ else "admin"
+    pw = os.environ["MONGO_PASSWORD"]
+    # MongoDB database names cap at 63 chars; truncate defensively for any future long test name
+    # ("ol_scratch_" is short enough that today's test names all fit without truncation).
+    db_name = f"ol_scratch_{request.node.name}"[:63]
+
+    client = MongoClient(
+        host=host,
+        port=port,
+        username=user,
+        password=pw,
+        authSource="admin",
+        directConnection=True,
+    )
+    try:
+        if db_name in client.list_database_names():
+            pytest.fail(
+                f"scratch database {db_name!r} already exists on the target MongoDB "
+                f"({host}:{port}). Refusing to run to avoid overwriting it. "
+                f"Investigate, then drop it explicitly to re-enable this test."
+            )
+
+        yield client, db_name
+
+        client.drop_database(db_name)
+    finally:
+        client.close()
+
+
+@pytest.fixture
+def ontology_loader(scratch_mongo):
+    """
+    Initialize the OntologyLoader with test parameters, against a dedicated scratch database.
 
     :return: OntologyLoaderController instance.
     """
+    client, db_name = scratch_mongo
     return OntologyLoaderController(
         source_ontology="envo",
         report_directory=tempfile.gettempdir(),
+        mongo_client=client,
+        db_name=db_name,
     )
 
 
@@ -80,18 +135,24 @@ def test_ontology_loader_rejects_duplicate_source_ontology():
     os.getenv("MONGO_PASSWORD") is None or os.getenv("ENABLE_DB_TESTS") != "true",
     reason="Skipping test: Requires MONGO_PASSWORD and ENABLE_DB_TESTS=true",
 )
-def test_ontology_loader_run(schema_view, ontology_loader):
+def test_ontology_loader_run(schema_view, ontology_loader, scratch_mongo):
     """
     Test running the ontology loader and inserting data into MongoDB.
 
     :param schema_view: NMDC schema view.
-    :param ontology_loader: OntologyLoaderController instance.
+    :param ontology_loader: OntologyLoaderController instance, already pointed at scratch_mongo.
+    :param scratch_mongo: (client, db_name) fixture is function-scoped, so requesting it here
+        yields the same instance ontology_loader was built with, for verifying its writes.
     """
     ontology_loader.run_ontology_loader()
 
-    # Connect to MongoDB and verify inserted data
+    # Connect to MongoDB and verify inserted data, in the same scratch database ontology_loader
+    # just wrote to (not whatever database MongoDBConfig() would otherwise default to).
+    client, db_name = scratch_mongo
     db_manager = MongoDBLoader(
         schema_view=schema_view,
+        mongo_client=client,
+        db_name=db_name,
     )
 
     # Check ontology class insertions
@@ -264,13 +325,19 @@ def test_ontology_loader_reports_multi_ontology_do_not_collide():
     os.getenv("MONGO_PASSWORD") is None or os.getenv("ENABLE_DB_TESTS") != "true",
     reason="Skipping test: Requires MONGO_PASSWORD and ENABLE_DB_TESTS=true",
 )
-def test_obsolete_handling_in_ontology_loader():
-    """Test the handling of obsolete terms when processing ontology data."""
-    # Use a custom temp directory for this test
+def test_obsolete_handling_in_ontology_loader(scratch_mongo):
+    """
+    Test the handling of obsolete terms when processing ontology data.
 
-    # Connect to MongoDB
+    Runs against a dedicated scratch database (scratch_mongo) instead of whatever database
+    MongoDBConfig() would otherwise default to, so this never writes TEST:* documents into a
+    developer's real ontology_class_set/ontology_relation_set collections. Cleanup is
+    unconditional (the whole database is dropped by the fixture), not a delete() call at the end
+    of the test body that a failed assertion above it would skip.
+    """
+    client, db_name = scratch_mongo
     schema_view = load_yaml_from_package("nmdc_schema", "nmdc_materialized_patterns.yaml")
-    db_manager = MongoDBLoader(schema_view=schema_view)
+    db_manager = MongoDBLoader(schema_view=schema_view, mongo_client=client, db_name=db_name)
 
     # Create a fake obsolete term and add it to the database to ensure we have something to test with
     class_collection = db_manager.db.create_collection("ontology_class_set", recreate_if_exists=False)
@@ -323,12 +390,6 @@ def test_obsolete_handling_in_ontology_loader():
     # Check that the relation referencing our obsolete term has been removed
     subject_relations = relation_collection.find({"subject": "TEST:0000001"})
     assert subject_relations.num_rows == 0, "Found relations with obsolete term as subject"
-
-    # Use delete() instead of delete_many() since MongoDBCollection doesn't have delete_many
-    class_collection.delete({"id": "TEST:0000001"})
-    class_collection.delete({"id": "TEST:0000002"})
-    relation_collection.delete({"subject": "TEST:0000001"})
-    relation_collection.delete({"object": "TEST:0000002"})
 
 
 @pytest.mark.skip(reason="Test needs more complete mocking of MongoDB interaction")
