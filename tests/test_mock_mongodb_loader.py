@@ -560,3 +560,42 @@ def test_fast_initial_index_build_non_duplicate_failure_reraises_unchanged(
     assert exc_info.value is original_error
     assert exc_info.value.code == 13
     assert "already contains duplicate" not in str(exc_info.value)
+
+
+def test_fast_initial_tolerates_pre_existing_differently_named_unique_index(
+    mock_mongo_client, mock_ontology_classes, mock_ontology_relations
+):
+    """
+    A pre-existing unique index on the same key, under a different name, must not crash the load.
+
+    Reproduces https://github.com/microbiomedata/ontology-loader/issues/68: NMDC prod's
+    `ontology_class_set` already carries a unique index on `id` named `id_1` from the meticulous
+    path (added 2025-05-13, before this fast-initial path existed). MongoDB refuses to create a
+    second index with the same key pattern under this path's own name
+    (`ontology_class_fast_initial_unique_id_index`), so without this tolerance the very first
+    fast-initial run against prod would crash before loading anything.
+    """
+    loader = MongoDBLoader(mongo_client=mock_mongo_client, db_name="test_db")
+
+    class _FakeMongoDB:
+        def __init__(self):
+            self._collections = {}
+
+        def __getitem__(self, name):
+            return self._collections.setdefault(name, MagicMock())
+
+    fake_db = _FakeMongoDB()
+    loader._py_client = MagicMock()
+    loader._py_client.__getitem__.return_value = fake_db
+
+    class_collection = fake_db["ontology_class_set"]
+    class_collection.list_indexes.return_value = [
+        {"key": {"_id": 1}, "name": "_id_"},
+        {"key": {"id": 1}, "name": "id_1", "unique": True},
+    ]
+
+    loader.insert_ontology_data_fast_initial(mock_ontology_classes, mock_ontology_relations)
+
+    # The pre-existing index already satisfies uniqueness: no redundant, differently-named index
+    # should be created. That create_index call is exactly what MongoDB rejects on prod today.
+    class_collection.create_index.assert_not_called()

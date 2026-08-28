@@ -279,6 +279,29 @@ class MongoDBLoader:
             Report("relation_insert", insertions_report_relations, ["subject", "predicate", "object"]),
         )
 
+    @staticmethod
+    def _ensure_fast_initial_unique_index(collection, keys: list, name: str) -> None:
+        """
+        Create a unique index on ``keys`` under ``name``, tolerating a pre-existing index on the
+        same key spec under a different name.
+
+        MongoDB refuses to create a second index with an identical key pattern but a different
+        name, even when the existing index is already unique and would satisfy the same guarantee.
+        That is exactly what NMDC prod's ``ontology_class_set`` looks like today: it already carries
+        a unique index on ``id`` named ``id_1`` from the meticulous path (added 2025-05-13), so
+        creating this method's own differently-named index would otherwise crash on the very first
+        fast-initial run against prod, before loading anything. See
+        https://github.com/microbiomedata/ontology-loader/issues/68.
+        """
+        for existing in collection.list_indexes():
+            if list(existing["key"].items()) == keys and existing.get("unique"):
+                logging.info(
+                    f"Fast-initial: an index on {keys} already exists as '{existing['name']}' and is "
+                    f"already unique; not creating '{name}' alongside it."
+                )
+                return
+        collection.create_index(keys, unique=True, name=name)
+
     def insert_ontology_data_fast_initial(
         self,
         ontology_classes: List[OntologyClass],
@@ -323,11 +346,13 @@ class MongoDBLoader:
         # The per-document uniqueness check during insert_many is the only ongoing cost, and it is
         # far cheaper than the meticulous path's per-item find-then-update round trip.
         try:
-            py_class.create_index("id", unique=True, name="ontology_class_fast_initial_unique_id_index")
-            py_relation.create_index(
+            self._ensure_fast_initial_unique_index(
+                py_class, [("id", 1)], "ontology_class_fast_initial_unique_id_index"
+            )
+            self._ensure_fast_initial_unique_index(
+                py_relation,
                 [("subject", 1), ("predicate", 1), ("object", 1)],
-                unique=True,
-                name="ontology_relation_fast_initial_unique_spo_index",
+                "ontology_relation_fast_initial_unique_spo_index",
             )
         except OperationFailure as index_error:
             if index_error.code != _DUPLICATE_KEY_CODE:
