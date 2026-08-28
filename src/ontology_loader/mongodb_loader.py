@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import asdict, fields
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from linkml_runtime import SchemaView
 from linkml_store import Client
@@ -280,7 +280,7 @@ class MongoDBLoader:
         )
 
     @staticmethod
-    def _ensure_fast_initial_unique_index(collection, keys: list, name: str) -> None:
+    def _ensure_fast_initial_unique_index(collection, keys: List[Tuple[str, int]], name: str) -> None:
         """
         Create a unique index on ``keys`` under ``name``, tolerating a pre-existing same-key index.
 
