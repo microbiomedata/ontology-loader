@@ -293,6 +293,7 @@ class MongoDBLoader:
         fast-initial run against prod, before loading anything. See
         https://github.com/microbiomedata/ontology-loader/issues/68.
         """
+
         for existing in collection.list_indexes():
             if list(existing["key"].items()) == keys and existing.get("unique"):
                 logging.info(
