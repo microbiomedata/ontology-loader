@@ -282,8 +282,7 @@ class MongoDBLoader:
     @staticmethod
     def _ensure_fast_initial_unique_index(collection, keys: list, name: str) -> None:
         """
-        Create a unique index on ``keys`` under ``name``, tolerating a pre-existing index on the
-        same key spec under a different name.
+        Create a unique index on ``keys`` under ``name``, tolerating a pre-existing same-key index.
 
         MongoDB refuses to create a second index with an identical key pattern but a different
         name, even when the existing index is already unique and would satisfy the same guarantee.
@@ -293,7 +292,6 @@ class MongoDBLoader:
         fast-initial run against prod, before loading anything. See
         https://github.com/microbiomedata/ontology-loader/issues/68.
         """
-
         for existing in collection.list_indexes():
             if list(existing["key"].items()) == keys and existing.get("unique"):
                 logging.info(
@@ -347,9 +345,7 @@ class MongoDBLoader:
         # The per-document uniqueness check during insert_many is the only ongoing cost, and it is
         # far cheaper than the meticulous path's per-item find-then-update round trip.
         try:
-            self._ensure_fast_initial_unique_index(
-                py_class, [("id", 1)], "ontology_class_fast_initial_unique_id_index"
-            )
+            self._ensure_fast_initial_unique_index(py_class, [("id", 1)], "ontology_class_fast_initial_unique_id_index")
             self._ensure_fast_initial_unique_index(
                 py_relation,
                 [("subject", 1), ("predicate", 1), ("object", 1)],
