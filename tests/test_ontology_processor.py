@@ -75,7 +75,17 @@ def test_get_relations_closure():
         assert "object" in rel
 
 
-def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors():
+@pytest.mark.parametrize(
+    "predicate",
+    [
+        "rdfs:subClassOf",
+        # part_of: almost never reflexive in entailed_edge itself (2 self-loops out of 36,857
+        # envo edges, vs subClassOf's 6,906 out of 75,484) -- catches the gap Copilot review found
+        # on this PR, where relying on the table's own reflexivity silently dropped self-pairs.
+        "BFO:0000050",
+    ],
+)
+def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicate):
     """
     The bulk entailed_edge query must match the old per-entity adapter.ancestors() loop exactly.
 
@@ -94,12 +104,13 @@ def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors():
         )
     )
     assert len(sample_entities) == 20, "sanity check: envo should have at least 20 non-obsolete classes"
+    relevant_entities = set(entity for entity in processor.adapter.entities() if processor._matches_ontology(entity))
     sample_entities_set = set(sample_entities)
 
     # One bulk query for all sample entities at once -- this is the whole point of the change.
     # Only retain pairs for the sampled subjects: the full closure can be tens of millions of
     # rows at NCBITaxon scale, and this test only needs 20 of them (Copilot review on this PR).
-    pairs = processor._ancestry_pairs_from_entailed_edge(["rdfs:subClassOf"])
+    pairs = processor._ancestry_pairs_from_entailed_edge([predicate], relevant_entities)
     new_ancestors_by_subject = {}
     for subject, obj in pairs:
         if subject in sample_entities_set:
@@ -108,8 +119,36 @@ def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors():
     for entity in sample_entities:
         old_ancestors = {
             a
-            for a in processor.adapter.ancestors(entity, reflexive=True, predicates=["rdfs:subClassOf"])
+            for a in processor.adapter.ancestors(entity, reflexive=True, predicates=[predicate])
             if processor._matches_ontology(a)
         }
         new_ancestors = new_ancestors_by_subject.get(entity, set())
-        assert new_ancestors == old_ancestors, f"mismatch for {entity}"
+        assert new_ancestors == old_ancestors, f"mismatch for {entity} on predicate {predicate}"
+
+
+def test_ancestry_pairs_from_entailed_edge_excludes_deprecated_subjects():
+    """
+    A deprecated/obsolete entity must not appear as a subject or object in the results.
+
+    The old per-entity loop's start set came from ``self.adapter.entities()``, which defaults to
+    ``filter_obsoletes=True`` and so never iterated a deprecated entity in the first place. A bare
+    id-prefix match on ``entailed_edge`` does not know about deprecation, and envo's own
+    ``entailed_edge`` does contain rows for deprecated subjects (453 for `rdfs:subClassOf` alone,
+    verified directly against the sqlite file) -- so without filtering against the real entity set,
+    an obsolete class could leak into the closure. Copilot review on this PR.
+    """
+    processor = OntologyProcessor("envo", force_refresh=False)
+
+    obsolete_entities = [e for e in processor.adapter.obsoletes() if processor._matches_ontology(e)]
+    assert obsolete_entities, "sanity check: envo should have at least one obsolete class"
+    an_obsolete_entity = obsolete_entities[0]
+
+    relevant_entities = set(entity for entity in processor.adapter.entities() if processor._matches_ontology(entity))
+    assert an_obsolete_entity not in relevant_entities, (
+        "sanity check: obsolete entities excluded from relevant_entities"
+    )
+
+    pairs = list(processor._ancestry_pairs_from_entailed_edge(["rdfs:subClassOf"], relevant_entities))
+
+    subjects_and_objects = {s for s, _ in pairs} | {o for _, o in pairs}
+    assert an_obsolete_entity not in subjects_and_objects

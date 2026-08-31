@@ -166,19 +166,34 @@ class OntologyProcessor:
         head, sep, _ = entity_id.partition(":")
         return bool(sep) and head.lower() == self._ontology_lc
 
-    def _ancestry_pairs_from_entailed_edge(self, predicates: list):
+    def _ancestry_pairs_from_entailed_edge(self, predicates: list, relevant_entities: set):
         """
         Return every (subject, object) ancestry pair for ``predicates``, from semsql's own table.
 
         Reads directly from ``entailed_edge`` instead of issuing one ``adapter.ancestors()`` call
-        per entity. ``entailed_edge`` already holds the full transitive closure that ``ancestors()`` computes
-        on the fly, reflexive edges included (verified: a self-loop for each entity is present in
-        the table, matching the ``reflexive=True`` semantics the old per-entity loop asked for
-        explicitly). One indexed scan replaces ~2.7M individual SQL traversals for NCBITaxon.
-        Measured against the real NCBITaxon semsql database: 29m9s (the old per-entity loop, from
-        a real run's own log) versus 13.0s for an unfiltered bulk scan of all 51,991,442 rows --
-        about 134x faster. Correctness verified against the old ``adapter.ancestors()`` output on
-        real envo entities (exact match, including a multi-ancestor case).
+        per entity. ``entailed_edge`` already holds the full transitive closure that ``ancestors()``
+        computes on the fly. One indexed scan replaces ~2.7M individual SQL traversals for
+        NCBITaxon. Measured against the real NCBITaxon semsql database: 29m9s (the old per-entity
+        loop, from a real run's own log) versus 13.0s for an unfiltered bulk scan of all
+        51,991,442 rows -- about 134x faster. Correctness verified against the old
+        ``adapter.ancestors()`` output on real envo entities.
+
+        Two corrections found by Copilot review on this PR, both verified against real envo data
+        before fixing:
+
+        - ``entailed_edge`` is *not* reliably reflexive per predicate. ``rdfs:subClassOf`` mostly
+          is (6,906 self-loops out of 75,484 envo edges), but ``BFO:0000050`` (part_of) almost
+          never is (2 out of 36,857) -- so relying on the table's own self-loops, the way the
+          first version of this method did, silently dropped nearly every self-pair for a
+          ``partof`` closure. The old ``adapter.ancestors(..., reflexive=True)`` call guaranteed a
+          self-pair for every entity regardless of the data; self-pairs are now unioned in
+          explicitly here, for the same guarantee.
+        - The SQL-level ``id_prefix`` filter alone is not equivalent to the old entity set. The old
+          loop's start set came from ``self.adapter.entities()``, which excludes deprecated nodes;
+          a bare prefix match does not, and envo's ``entailed_edge`` does contain rows for
+          deprecated subjects (453 for ``rdfs:subClassOf`` alone). Results are now filtered against
+          ``relevant_entities`` -- the same, already-correctly-filtered set the direct-relationship
+          phase uses -- not just the id prefix.
 
         ``DISTINCT`` is unconditional, not just for multi-predicate closures like ``combined``:
         the old code deduplicated ancestors per entity via a Python ``set()`` regardless of how
@@ -187,7 +202,10 @@ class OntologyProcessor:
 
         :param predicates: List of predicate CURIEs (e.g. ``["rdfs:subClassOf"]`` or
             ``["rdfs:subClassOf", "BFO:0000050"]``) to include in this closure.
-        :return: Generator of (subject, object) tuples, both sides filtered to this ontology.
+        :param relevant_entities: The exact set of valid subjects/objects for this ontology
+            (already filtered for prefix and deprecation) -- the same set ``get_relations_closure``
+            builds via ``self.adapter.entities()`` before calling this method.
+        :return: Generator of (subject, object) tuples, both sides in ``relevant_entities``.
         """
         placeholders = ",".join("?" for _ in predicates)
         prefix_pattern = f"{self._ontology_lc}:%"
@@ -201,9 +219,18 @@ class OntologyProcessor:
         # change exists to avoid, even though the SQL scan itself is fast. The `with` block stays
         # open across the caller's iteration because a generator suspends at `yield` rather than
         # returning, keeping the connection alive until the caller is done or the generator is
-        # garbage-collected. Copilot review on this PR.
+        # garbage-collected.
+        #
+        # The id-prefix LIKE filter still runs in SQL first (cheap index range scan, narrows a
+        # 52M-row table down before Python sees anything); relevant_entities membership -- exact,
+        # already excludes deprecated nodes -- is the correctness filter on top of that narrowing,
+        # not a replacement for it.
         with sqlite3.connect(self.ontology_db_path) as con:
-            yield from con.execute(query, params)
+            for subject, obj in con.execute(query, params):
+                if subject in relevant_entities and obj in relevant_entities:
+                    yield subject, obj
+        for entity in relevant_entities:
+            yield entity, entity
 
     def get_terms_and_metadata(self):
         """Retrieve all terms that belong to this ontology and return a list of OntologyClass objects."""
@@ -297,7 +324,7 @@ class OntologyProcessor:
             )
             ancestry_count = 0
             for preds, closure_predicate_name in ancestry_specs:
-                pairs = self._ancestry_pairs_from_entailed_edge(preds)
+                pairs = self._ancestry_pairs_from_entailed_edge(preds, relevant_entities)
                 for subject, obj in tqdm(
                     pairs,
                     desc=f"Emitting {self.ontology} {closure_predicate_name}",
