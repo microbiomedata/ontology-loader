@@ -166,7 +166,7 @@ class OntologyProcessor:
         head, sep, _ = entity_id.partition(":")
         return bool(sep) and head.lower() == self._ontology_lc
 
-    def _ancestry_pairs_from_entailed_edge(self, predicates: list) -> list:
+    def _ancestry_pairs_from_entailed_edge(self, predicates: list):
         """
         Return every (subject, object) ancestry pair for ``predicates``, from semsql's own table.
 
@@ -187,7 +187,7 @@ class OntologyProcessor:
 
         :param predicates: List of predicate CURIEs (e.g. ``["rdfs:subClassOf"]`` or
             ``["rdfs:subClassOf", "BFO:0000050"]``) to include in this closure.
-        :return: List of (subject, object) tuples, both sides filtered to this ontology.
+        :return: Generator of (subject, object) tuples, both sides filtered to this ontology.
         """
         placeholders = ",".join("?" for _ in predicates)
         prefix_pattern = f"{self._ontology_lc}:%"
@@ -196,8 +196,14 @@ class OntologyProcessor:
             f"WHERE predicate IN ({placeholders}) AND subject LIKE ? AND object LIKE ?"
         )
         params = [*predicates, prefix_pattern, prefix_pattern]
+        # A generator, not fetchall(): NCBITaxon-scale closures are tens of millions of rows, and
+        # materializing that as a Python list would reintroduce the same peak-memory problem this
+        # change exists to avoid, even though the SQL scan itself is fast. The `with` block stays
+        # open across the caller's iteration because a generator suspends at `yield` rather than
+        # returning, keeping the connection alive until the caller is done or the generator is
+        # garbage-collected. Copilot review on this PR.
         with sqlite3.connect(self.ontology_db_path) as con:
-            return con.execute(query, params).fetchall()
+            yield from con.execute(query, params)
 
     def get_terms_and_metadata(self):
         """Retrieve all terms that belong to this ontology and return a list of OntologyClass objects."""

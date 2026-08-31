@@ -1,5 +1,7 @@
 """Test OntologyProcessor class and its methods."""
 
+import itertools
+
 import pytest
 
 from src.ontology_loader.ontology_processor import OntologyProcessor
@@ -85,16 +87,23 @@ def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors():
     """
     processor = OntologyProcessor("envo", force_refresh=False)
 
-    sample_entities = [
-        entity for entity in processor.adapter.entities(filter_obsoletes=True) if entity.startswith("ENVO:")
-    ][:20]
+    sample_entities = list(
+        itertools.islice(
+            (entity for entity in processor.adapter.entities(filter_obsoletes=True) if entity.startswith("ENVO:")),
+            20,
+        )
+    )
     assert len(sample_entities) == 20, "sanity check: envo should have at least 20 non-obsolete classes"
+    sample_entities_set = set(sample_entities)
 
     # One bulk query for all sample entities at once -- this is the whole point of the change.
+    # Only retain pairs for the sampled subjects: the full closure can be tens of millions of
+    # rows at NCBITaxon scale, and this test only needs 20 of them (Copilot review on this PR).
     pairs = processor._ancestry_pairs_from_entailed_edge(["rdfs:subClassOf"])
     new_ancestors_by_subject = {}
     for subject, obj in pairs:
-        new_ancestors_by_subject.setdefault(subject, set()).add(obj)
+        if subject in sample_entities_set:
+            new_ancestors_by_subject.setdefault(subject, set()).add(obj)
 
     for entity in sample_entities:
         old_ancestors = {
