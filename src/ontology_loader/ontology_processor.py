@@ -4,6 +4,7 @@ import gzip
 import logging
 import shutil
 import sqlite3
+from typing import Iterator
 
 import pystow
 from linkml_runtime.dumpers import json_dumper
@@ -166,14 +167,20 @@ class OntologyProcessor:
         head, sep, _ = entity_id.partition(":")
         return bool(sep) and head.lower() == self._ontology_lc
 
-    def _ancestry_pairs_from_entailed_edge(self, predicates: list, relevant_entities: set):
+    def _ancestry_pairs_from_entailed_edge(
+        self, predicates: list[str], relevant_entities: set[str]
+    ) -> Iterator[tuple[str, str]]:
         """
         Return every (subject, object) ancestry pair for ``predicates``, from semsql's own table.
 
         Reads directly from ``entailed_edge`` instead of issuing one ``adapter.ancestors()`` call
-        per entity. ``entailed_edge`` already holds the full transitive closure that ``ancestors()``
-        computes on the fly. One indexed scan replaces ~2.7M individual SQL traversals for
-        NCBITaxon. Measured against the real NCBITaxon semsql database: 29m9s (the old per-entity
+        per entity. The pinned oaklib (``^0.6.16``) SQL adapter's own ``ancestors()`` already
+        queries this same table (``self.session.query(EntailedEdge.object).distinct()``, filtered
+        by subject) -- it does not compute the traversal on the fly, and it already unions in
+        reflexive self-pairs in Python the same way this method does. So the speedup here is not
+        from avoiding recomputation; it is from replacing ~2.7M individual per-entity ``DISTINCT``
+        queries with one bulk ``DISTINCT`` query, cutting the per-call overhead that dominates at
+        that scale. Measured against the real NCBITaxon semsql database: 29m9s (the old per-entity
         loop, from a real run's own log) versus 13.0s for an unfiltered bulk scan of all
         51,991,442 rows -- about 134x faster. Correctness verified against the old
         ``adapter.ancestors()`` output on real envo entities.

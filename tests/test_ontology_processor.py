@@ -136,14 +136,21 @@ def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicate):
 
 def test_ancestry_pairs_from_entailed_edge_excludes_deprecated_subjects():
     """
-    A deprecated/obsolete entity must not appear as a subject or object in the results.
+    A deprecated/obsolete entity must not appear as a *subject* in the results.
 
     The old per-entity loop's start set came from ``self.adapter.entities()``, which defaults to
     ``filter_obsoletes=True`` and so never iterated a deprecated entity in the first place. A bare
     id-prefix match on ``entailed_edge`` does not know about deprecation, and envo's own
     ``entailed_edge`` does contain rows for deprecated subjects (453 for `rdfs:subClassOf` alone,
     verified directly against the sqlite file) -- so without filtering against the real entity set,
-    an obsolete class could leak into the closure. Copilot review on this PR.
+    an obsolete class could leak into the closure as a subject.
+
+    Deliberately does not assert the same for objects: the production method preserves the old
+    per-entity loop's asymmetry on purpose (subjects checked against ``relevant_entities``, objects
+    only prefix-checked), since the old code only ever ontology-prefix-filtered returned ancestors,
+    never deprecation-filtered them. Asserting on both would test stricter behavior than what the
+    method actually guarantees. Copilot review on this PR (twice: once for the subject-side gap,
+    once for this test over-asserting on the object side).
     """
     processor = OntologyProcessor("envo", force_refresh=False)
 
@@ -158,5 +165,5 @@ def test_ancestry_pairs_from_entailed_edge_excludes_deprecated_subjects():
 
     pairs = list(processor._ancestry_pairs_from_entailed_edge(["rdfs:subClassOf"], relevant_entities))
 
-    subjects_and_objects = {s for s, _ in pairs} | {o for _, o in pairs}
-    assert an_obsolete_entity not in subjects_and_objects
+    subjects = {s for s, _ in pairs}
+    assert an_obsolete_entity not in subjects
