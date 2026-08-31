@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+- **Every fresh ontology download was broken: the raw `bbop-sqlite` S3 bucket's public access has been retired.** `download_and_prepare_ontology` hardcoded `https://s3.amazonaws.com/bbop-sqlite/`, which now returns a genuine `403 AccessDenied` (verified directly, not a transient blip). Since `OntologyProcessor` defaults to `force_refresh=True`, and any environment with no existing cache has nothing to fall back on, this broke every first-time load of every ontology, not just NCBITaxon. Fixed by repointing to the SemanticSQL CDN (`https://semanticsql.berkeleybop.io/`, identical object paths) and switching pystow's download backend to `requests` with an explicit non-default `User-Agent` — the CDN sits behind a Browser Integrity Check that 403s default client User-Agents (`Python-urllib`, bare `curl`/`wget`), and pystow's default `urllib` backend has no clean way to set request headers at all. Verified end-to-end: a genuinely fresh, never-cached download (PATO) now succeeds. See https://github.com/microbiomedata/ontology-loader/issues/59.
+
 ## [0.3.0] - 2026-08-28
 
 ### Fixed
