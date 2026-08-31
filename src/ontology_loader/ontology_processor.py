@@ -202,10 +202,12 @@ class OntologyProcessor:
 
         :param predicates: List of predicate CURIEs (e.g. ``["rdfs:subClassOf"]`` or
             ``["rdfs:subClassOf", "BFO:0000050"]``) to include in this closure.
-        :param relevant_entities: The exact set of valid subjects/objects for this ontology
-            (already filtered for prefix and deprecation) -- the same set ``get_relations_closure``
-            builds via ``self.adapter.entities()`` before calling this method.
-        :return: Generator of (subject, object) tuples, both sides in ``relevant_entities``.
+        :param relevant_entities: The exact, non-deprecated subject set for this ontology -- the
+            same set ``get_relations_closure`` builds via ``self.adapter.entities()`` before
+            calling this method. Used to filter subjects only; objects are filtered by id prefix
+            alone, matching the old per-entity loop's asymmetry (see above).
+        :return: Generator of (subject, object) tuples. Subject is always in ``relevant_entities``;
+            object is prefix-matched to this ontology but not deprecation-filtered.
         """
         placeholders = ",".join("?" for _ in predicates)
         prefix_pattern = f"{self._ontology_lc}:%"
@@ -226,6 +228,16 @@ class OntologyProcessor:
         # already excludes deprecated nodes -- is the correctness filter on top of that narrowing,
         # not a replacement for it.
         #
+        # Subjects and objects are filtered differently, on purpose, to match the old code exactly:
+        # the old loop's start set (subjects) came from relevant_entities, but each returned
+        # ancestor (object) was only checked with _matches_ontology -- a prefix match that does not
+        # exclude deprecated nodes. So a non-obsolete entity with a deprecated *ancestor* was
+        # historically included; only a deprecated *subject* never appeared, since the old loop
+        # never iterated one. Checked directly against envo's entailed_edge: zero rows currently
+        # have a non-obsolete subject with a deprecated object, so this has no observed effect
+        # today, but matching the asymmetry exactly costs nothing and removes any doubt for
+        # ontologies not checked here. Found by Copilot review on this PR.
+        #
         # entities_with_native_self_pair tracks which entities entailed_edge already gave a
         # self-loop, so the union below doesn't emit a duplicate for them. Bounded by
         # len(relevant_entities), not by the edge count -- comparable to relevant_entities itself,
@@ -236,7 +248,7 @@ class OntologyProcessor:
         entities_with_native_self_pair = set()
         with sqlite3.connect(self.ontology_db_path) as con:
             for subject, obj in con.execute(query, params):
-                if subject in relevant_entities and obj in relevant_entities:
+                if subject in relevant_entities and self._matches_ontology(obj):
                     if subject == obj:
                         entities_with_native_self_pair.add(subject)
                     yield subject, obj
