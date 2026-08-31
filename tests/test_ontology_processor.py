@@ -110,11 +110,19 @@ def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicate):
     # One bulk query for all sample entities at once -- this is the whole point of the change.
     # Only retain pairs for the sampled subjects: the full closure can be tens of millions of
     # rows at NCBITaxon scale, and this test only needs 20 of them (Copilot review on this PR).
-    pairs = processor._ancestry_pairs_from_entailed_edge([predicate], relevant_entities)
+    #
+    # Kept as a list, not deduplicated into the per-subject sets until after the uniqueness
+    # check below: a set would silently swallow a duplicate (subject, object) emission, which is
+    # exactly the shape of bug this test needs to catch (Copilot review on this PR -- an entity
+    # whose self-pair entailed_edge already had natively could otherwise be yielded twice, once
+    # from the SQL scan and once from the explicit reflexive union).
+    pairs = list(processor._ancestry_pairs_from_entailed_edge([predicate], relevant_entities))
+    sample_pairs = [(s, o) for s, o in pairs if s in sample_entities_set]
+    assert len(sample_pairs) == len(set(sample_pairs)), "duplicate (subject, object) pair emitted"
+
     new_ancestors_by_subject = {}
-    for subject, obj in pairs:
-        if subject in sample_entities_set:
-            new_ancestors_by_subject.setdefault(subject, set()).add(obj)
+    for subject, obj in sample_pairs:
+        new_ancestors_by_subject.setdefault(subject, set()).add(obj)
 
     for entity in sample_entities:
         old_ancestors = {

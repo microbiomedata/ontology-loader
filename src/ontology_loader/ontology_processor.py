@@ -225,12 +225,24 @@ class OntologyProcessor:
         # 52M-row table down before Python sees anything); relevant_entities membership -- exact,
         # already excludes deprecated nodes -- is the correctness filter on top of that narrowing,
         # not a replacement for it.
+        #
+        # entities_with_native_self_pair tracks which entities entailed_edge already gave a
+        # self-loop, so the union below doesn't emit a duplicate for them. Bounded by
+        # len(relevant_entities), not by the edge count -- comparable to relevant_entities itself,
+        # not a new large-memory structure. Without this, an entity whose predicate IS reflexive in
+        # entailed_edge (subClassOf usually is) would get its self-pair from the SQL scan AND from
+        # the explicit union below: a real duplicate in the plain-list ontology_relations the
+        # caller appends to, not just a test artifact. Found by Copilot review on this PR.
+        entities_with_native_self_pair = set()
         with sqlite3.connect(self.ontology_db_path) as con:
             for subject, obj in con.execute(query, params):
                 if subject in relevant_entities and obj in relevant_entities:
+                    if subject == obj:
+                        entities_with_native_self_pair.add(subject)
                     yield subject, obj
         for entity in relevant_entities:
-            yield entity, entity
+            if entity not in entities_with_native_self_pair:
+                yield entity, entity
 
     def get_terms_and_metadata(self):
         """Retrieve all terms that belong to this ontology and return a list of OntologyClass objects."""
