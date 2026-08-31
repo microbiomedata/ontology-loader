@@ -96,8 +96,10 @@ class OntologyProcessor:
             else:
                 logger.info(f"Reusing cached pystow directory for {self.ontology}: {source_ontology_module}")
 
-        # Define ontology URL
-        ontology_db_url_prefix = "https://s3.amazonaws.com/bbop-sqlite/"
+        # Define ontology URL. The raw bbop-sqlite S3 bucket's public access has been retired
+        # (INCATools/semantic-sql#112); object paths are unchanged, only the host differs. See
+        # https://github.com/microbiomedata/ontology-loader/issues/59.
+        ontology_db_url_prefix = "https://semanticsql.berkeleybop.io/"
         ontology_db_url_suffix = ".db.gz"
         ontology_url = ontology_db_url_prefix + self.ontology + ontology_db_url_suffix
 
@@ -105,7 +107,20 @@ class OntologyProcessor:
         # pystow.ensure() is a no-op if the file already exists at the expected path,
         # so this is what handles the "reuse cache if present, download if missing"
         # branch when force_refresh=False.
-        compressed_path = pystow.ensure(self.ontology, f"{self.ontology}.db.gz", url=ontology_url)
+        #
+        # The CDN sits behind a Browser Integrity Check that 403s default client User-Agents
+        # (Python-urllib, bare curl/wget), so this must use the 'requests' backend with an
+        # explicit non-default User-Agent -- pystow's default 'urllib' backend has no clean way
+        # to set request headers at all.
+        compressed_path = pystow.ensure(
+            self.ontology,
+            f"{self.ontology}.db.gz",
+            url=ontology_url,
+            download_kwargs={
+                "backend": "requests",
+                "headers": {"User-Agent": "ontology-loader (https://github.com/microbiomedata/ontology-loader)"},
+            },
+        )
         decompressed_path = compressed_path.with_suffix("")  # Remove .gz to get .db file
 
         # Extract the file if not already extracted
