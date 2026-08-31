@@ -71,3 +71,36 @@ def test_get_relations_closure():
         assert "subject" in rel
         assert "predicate" in rel
         assert "object" in rel
+
+
+def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors():
+    """
+    The bulk entailed_edge query must match the old per-entity adapter.ancestors() loop exactly.
+
+    See https://github.com/microbiomedata/ontology-loader/issues/18: same result, one bulk query
+    instead of one call per entity. Checked against real envo entities, not mocks: the risk here
+    is a semantic mismatch between semsql's pre-materialized closure and oaklib's on-the-fly
+    traversal (e.g. reflexivity, or a predicate not actually being entailed), which a mock can't
+    catch because it can't be wrong about what oaklib itself does.
+    """
+    processor = OntologyProcessor("envo", force_refresh=False)
+
+    sample_entities = [
+        entity for entity in processor.adapter.entities(filter_obsoletes=True) if entity.startswith("ENVO:")
+    ][:20]
+    assert len(sample_entities) == 20, "sanity check: envo should have at least 20 non-obsolete classes"
+
+    # One bulk query for all sample entities at once -- this is the whole point of the change.
+    pairs = processor._ancestry_pairs_from_entailed_edge(["rdfs:subClassOf"])
+    new_ancestors_by_subject = {}
+    for subject, obj in pairs:
+        new_ancestors_by_subject.setdefault(subject, set()).add(obj)
+
+    for entity in sample_entities:
+        old_ancestors = {
+            a
+            for a in processor.adapter.ancestors(entity, reflexive=True, predicates=["rdfs:subClassOf"])
+            if processor._matches_ontology(a)
+        }
+        new_ancestors = new_ancestors_by_subject.get(entity, set())
+        assert new_ancestors == old_ancestors, f"mismatch for {entity}"
