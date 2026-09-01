@@ -76,16 +76,21 @@ def test_get_relations_closure():
 
 
 @pytest.mark.parametrize(
-    "predicate",
+    "predicates",
     [
-        "rdfs:subClassOf",
+        ["rdfs:subClassOf"],
         # part_of: almost never reflexive in entailed_edge itself (2 self-loops out of 36,857
         # envo edges, vs subClassOf's 6,906 out of 75,484) -- catches the gap Copilot review found
         # on this PR, where relying on the table's own reflexivity silently dropped self-pairs.
-        "BFO:0000050",
+        ["BFO:0000050"],
+        # combined: the production `combined` closure passes both predicates in one call, and
+        # DISTINCT is unconditional specifically so a pair reachable via more than one predicate
+        # is only emitted once -- a single-predicate case can't exercise that cross-predicate
+        # dedup at all. Copilot review on this PR.
+        ["rdfs:subClassOf", "BFO:0000050"],
     ],
 )
-def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicate):
+def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicates):
     """
     The bulk entailed_edge query must match the old per-entity adapter.ancestors() loop exactly.
 
@@ -116,8 +121,9 @@ def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicate):
     # check below: a set would silently swallow a duplicate (subject, object) emission, which is
     # exactly the shape of bug this test needs to catch (Copilot review on this PR -- an entity
     # whose self-pair entailed_edge already had natively could otherwise be yielded twice, once
-    # from the SQL scan and once from the explicit reflexive union).
-    pairs = list(processor._ancestry_pairs_from_entailed_edge([predicate], relevant_entities))
+    # from the SQL scan and once from the explicit reflexive union, or the same pair reached via
+    # two different predicates in the combined case).
+    pairs = list(processor._ancestry_pairs_from_entailed_edge(predicates, relevant_entities))
     sample_pairs = [(s, o) for s, o in pairs if s in sample_entities_set]
     assert len(sample_pairs) == len(set(sample_pairs)), "duplicate (subject, object) pair emitted"
 
@@ -128,11 +134,11 @@ def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicate):
     for entity in sample_entities:
         old_ancestors = {
             a
-            for a in processor.adapter.ancestors(entity, reflexive=True, predicates=[predicate])
+            for a in processor.adapter.ancestors(entity, reflexive=True, predicates=predicates)
             if processor._matches_ontology(a)
         }
         new_ancestors = new_ancestors_by_subject.get(entity, set())
-        assert new_ancestors == old_ancestors, f"mismatch for {entity} on predicate {predicate}"
+        assert new_ancestors == old_ancestors, f"mismatch for {entity} on predicates {predicates}"
 
 
 def test_ancestry_pairs_from_entailed_edge_excludes_deprecated_subjects():
