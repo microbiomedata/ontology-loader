@@ -4,6 +4,7 @@ import gzip
 import logging
 import shutil
 import sqlite3
+from contextlib import closing
 from typing import Iterator
 
 import pystow
@@ -227,8 +228,14 @@ class OntologyProcessor:
         # materializing that as a Python list would reintroduce the same peak-memory problem this
         # change exists to avoid, even though the SQL scan itself is fast. The `with` block stays
         # open across the caller's iteration because a generator suspends at `yield` rather than
-        # returning, keeping the connection alive until the caller is done or the generator is
-        # garbage-collected.
+        # returning, keeping the connection alive until the caller is done.
+        #
+        # contextlib.closing(), not sqlite3.Connection's own context manager: verified directly
+        # that sqlite3's __exit__ only commits/rolls back, it does not close the connection, so the
+        # bare `with sqlite3.connect(...) as con` this method used before left the handle open,
+        # relying on implementation-dependent garbage collection to release it eventually -- one
+        # handle per ancestry spec, and not guaranteed at all on non-refcounting runtimes. Found by
+        # Copilot review on this PR.
         #
         # The id-prefix LIKE filter still runs in SQL first (cheap index range scan, narrows a
         # 52M-row table down before Python sees anything); relevant_entities membership -- exact,
@@ -254,7 +261,7 @@ class OntologyProcessor:
         # this whole change). Skipping native self-loops during the scan loses nothing, since the
         # unconditional union below already accounts for every entity exactly once. Found by
         # Copilot review on this PR.
-        with sqlite3.connect(self.ontology_db_path) as con:
+        with closing(sqlite3.connect(self.ontology_db_path)) as con:
             for subject, obj in con.execute(query, params):
                 if subject == obj:
                     continue
