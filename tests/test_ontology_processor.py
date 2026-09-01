@@ -90,10 +90,11 @@ def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicate):
     The bulk entailed_edge query must match the old per-entity adapter.ancestors() loop exactly.
 
     See https://github.com/microbiomedata/ontology-loader/issues/18: same result, one bulk query
-    instead of one call per entity. Checked against real envo entities, not mocks: the risk here
-    is a semantic mismatch between semsql's pre-materialized closure and oaklib's on-the-fly
-    traversal (e.g. reflexivity, or a predicate not actually being entailed), which a mock can't
-    catch because it can't be wrong about what oaklib itself does.
+    against `entailed_edge` instead of one per-entity query against the same table via
+    `adapter.ancestors()`. Checked against real envo entities, not mocks: the risk here is a
+    semantic mismatch between the two query shapes (e.g. reflexivity, or a predicate not actually
+    being entailed), which a mock can't catch because it can't be wrong about what oaklib itself
+    does.
     """
     processor = OntologyProcessor("envo", force_refresh=False)
 
