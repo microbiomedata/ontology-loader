@@ -3,6 +3,9 @@
 import gzip
 import logging
 import shutil
+import sqlite3
+from contextlib import closing
+from typing import Iterator
 
 import pystow
 from linkml_runtime.dumpers import json_dumper
@@ -165,6 +168,47 @@ class OntologyProcessor:
         head, sep, _ = entity_id.partition(":")
         return bool(sep) and head.lower() == self._ontology_lc
 
+    def _ancestry_pairs_from_entailed_edge(
+        self, predicates: list[str], relevant_entities: set[str]
+    ) -> Iterator[tuple[str, str]]:
+        """
+        Return every (subject, object) ancestry pair for ``predicates``, from semsql's own table.
+
+        Reads ``entailed_edge`` in one bulk query instead of calling ``adapter.ancestors()`` once
+        per entity. ``entailed_edge`` is not reliably reflexive per predicate: every entity in
+        ``relevant_entities`` gets an explicit self-pair, and native self-loop rows are skipped
+        during the scan so a self-pair is never emitted twice. ``DISTINCT`` is unconditional, since
+        a multi-predicate closure can reach the same pair via more than one predicate.
+
+        :param predicates: List of predicate CURIEs (e.g. ``["rdfs:subClassOf"]`` or
+            ``["rdfs:subClassOf", "BFO:0000050"]``) to include in this closure.
+        :param relevant_entities: The exact, non-deprecated subject set for this ontology -- the
+            same set ``get_relations_closure`` builds via ``self.adapter.entities()`` before
+            calling this method. Used to filter subjects only; objects are filtered by id prefix
+            alone, not deprecation, matching the old per-entity loop's behavior.
+        :return: Generator of (subject, object) tuples. Subject is always in ``relevant_entities``;
+            object is prefix-matched to this ontology but not deprecation-filtered.
+        """
+        placeholders = ",".join("?" for _ in predicates)
+        prefix_pattern = f"{self._ontology_lc}:%"
+        query = (
+            f"SELECT DISTINCT subject, object FROM entailed_edge "  # noqa: S608 -- predicates
+            f"WHERE predicate IN ({placeholders}) AND subject LIKE ? AND object LIKE ?"
+        )
+        params = [*predicates, prefix_pattern, prefix_pattern]
+        # Generator, not fetchall(): NCBITaxon-scale closures are tens of millions of rows. The
+        # `with` block stays open across the caller's iteration because a generator suspends at
+        # `yield` rather than returning; contextlib.closing() is required because
+        # sqlite3.Connection's own context manager only commits/rolls back, it does not close.
+        with closing(sqlite3.connect(self.ontology_db_path)) as con:
+            for subject, obj in con.execute(query, params):
+                if subject == obj:
+                    continue
+                if subject in relevant_entities and self._matches_ontology(obj):
+                    yield subject, obj
+        for entity in relevant_entities:
+            yield entity, entity
+
     def get_terms_and_metadata(self):
         """Retrieve all terms that belong to this ontology and return a list of OntologyClass objects."""
         ontology_classes = []
@@ -257,20 +301,15 @@ class OntologyProcessor:
             )
             ancestry_count = 0
             for preds, closure_predicate_name in ancestry_specs:
-                for entity in tqdm(
-                    relevant_entities,
-                    desc=f"Computing {self.ontology} {closure_predicate_name}",
-                    unit="entity",
+                pairs = self._ancestry_pairs_from_entailed_edge(preds, relevant_entities)
+                for subject, obj in tqdm(
+                    pairs,
+                    desc=f"Emitting {self.ontology} {closure_predicate_name}",
+                    unit="pair",
                 ):
-                    ancestors = set(
-                        ancestor
-                        for ancestor in self.adapter.ancestors(entity, reflexive=True, predicates=preds)
-                        if self._matches_ontology(ancestor)
-                    )
-                    for ancestor in ancestors:
-                        relation_dict = _create_relation(entity, closure_predicate_name, ancestor, ontology_terms_dict)
-                        ontology_relations.append(relation_dict)
-                        ancestry_count += 1
+                    relation_dict = _create_relation(subject, closure_predicate_name, obj, ontology_terms_dict)
+                    ontology_relations.append(relation_dict)
+                    ancestry_count += 1
             logger.info(f"Processed {ancestry_count} ancestry relationships")
 
         logger.info(f"Total relations: {len(ontology_relations)}")

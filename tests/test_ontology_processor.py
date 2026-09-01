@@ -1,5 +1,7 @@
 """Test OntologyProcessor class and its methods."""
 
+import itertools
+
 import pytest
 
 from src.ontology_loader.ontology_processor import OntologyProcessor
@@ -71,3 +73,104 @@ def test_get_relations_closure():
         assert "subject" in rel
         assert "predicate" in rel
         assert "object" in rel
+
+
+@pytest.mark.parametrize(
+    "predicates",
+    [
+        ["rdfs:subClassOf"],
+        # part_of is almost never reflexive in entailed_edge itself, unlike subClassOf; catches a
+        # method that relies on the table's own reflexivity instead of unioning self-pairs in.
+        ["BFO:0000050"],
+        # The production `combined` closure passes both predicates in one call, and DISTINCT is
+        # unconditional so a pair reachable via more than one predicate is only emitted once; a
+        # single-predicate case can't exercise that cross-predicate dedup.
+        ["rdfs:subClassOf", "BFO:0000050"],
+    ],
+)
+def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicates):
+    """
+    The bulk entailed_edge query must match the old per-entity adapter.ancestors() loop exactly.
+
+    See https://github.com/microbiomedata/ontology-loader/issues/18: same result, one bulk query
+    against `entailed_edge` instead of one per-entity query against the same table via
+    `adapter.ancestors()`. Checked against real envo entities, not mocks: the risk here is a
+    semantic mismatch between the two query shapes (e.g. reflexivity, or a predicate not actually
+    being entailed), which a mock can't catch because it can't be wrong about what oaklib itself
+    does.
+    """
+    processor = OntologyProcessor("envo", force_refresh=False)
+
+    sample_entities = list(
+        itertools.islice(
+            (entity for entity in processor.adapter.entities(filter_obsoletes=True) if entity.startswith("ENVO:")),
+            20,
+        )
+    )
+    assert len(sample_entities) == 20, "sanity check: envo should have at least 20 non-obsolete classes"
+    relevant_entities = set(entity for entity in processor.adapter.entities() if processor._matches_ontology(entity))
+    sample_entities_set = set(sample_entities)
+
+    # One bulk query for all sample entities at once -- this is the whole point of the change.
+    # Only retain pairs for the sampled subjects: the full closure can be tens of millions of
+    # rows at NCBITaxon scale, and this test only needs 20 of them.
+    #
+    # Kept as a list, not deduplicated into the per-subject sets until after the uniqueness check
+    # below: a set would silently swallow a duplicate (subject, object) emission, which is exactly
+    # the shape of bug this test needs to catch (an entity whose self-pair entailed_edge already
+    # had natively could otherwise be yielded twice, or the same pair reached via two different
+    # predicates in the combined case).
+    pairs = list(processor._ancestry_pairs_from_entailed_edge(predicates, relevant_entities))
+    sample_pairs = [(s, o) for s, o in pairs if s in sample_entities_set]
+    assert len(sample_pairs) == len(set(sample_pairs)), "duplicate (subject, object) pair emitted"
+
+    new_ancestors_by_subject = {}
+    for subject, obj in sample_pairs:
+        new_ancestors_by_subject.setdefault(subject, set()).add(obj)
+
+    for entity in sample_entities:
+        old_ancestors = {
+            a
+            for a in processor.adapter.ancestors(entity, reflexive=True, predicates=predicates)
+            if processor._matches_ontology(a)
+        }
+        new_ancestors = new_ancestors_by_subject.get(entity, set())
+        assert new_ancestors == old_ancestors, f"mismatch for {entity} on predicates {predicates}"
+
+
+def test_ancestry_pairs_from_entailed_edge_excludes_deprecated_subjects():
+    """
+    A deprecated/obsolete entity must not appear as a *subject* in the results.
+
+    The old per-entity loop's start set came from ``self.adapter.entities()``, which defaults to
+    ``filter_obsoletes=True`` and so never iterated a deprecated entity in the first place. A bare
+    id-prefix match on ``entailed_edge`` does not know about deprecation, and envo's own
+    ``entailed_edge`` does contain rows for deprecated subjects -- so without filtering against the
+    real entity set, an obsolete class could leak into the closure as a subject.
+
+    Deliberately does not assert the same for objects: the production method preserves the old
+    per-entity loop's asymmetry on purpose (subjects checked against ``relevant_entities``, objects
+    only prefix-checked), since the old code only ever ontology-prefix-filtered returned ancestors,
+    never deprecation-filtered them. Asserting on both would test stricter behavior than what the
+    method actually guarantees.
+
+    Checks *all* obsolete entities, not one arbitrary pick: the first obsolete entity oaklib
+    returns for envo has zero rows as a subject in ``entailed_edge`` at all, so a test asserting
+    only on that one would pass whether or not the deprecated-subject filter existed; checking all
+    of them is what actually exercises the filter.
+    """
+    processor = OntologyProcessor("envo", force_refresh=False)
+
+    obsolete_entities = [e for e in processor.adapter.obsoletes() if processor._matches_ontology(e)]
+    assert obsolete_entities, "sanity check: envo should have at least one obsolete class"
+
+    relevant_entities = set(entity for entity in processor.adapter.entities() if processor._matches_ontology(entity))
+    assert not (set(obsolete_entities) & relevant_entities), (
+        "sanity check: obsolete entities excluded from relevant_entities"
+    )
+
+    pairs = list(processor._ancestry_pairs_from_entailed_edge(["rdfs:subClassOf"], relevant_entities))
+
+    subjects = {s for s, _ in pairs}
+    leaked = subjects & set(obsolete_entities)
+    assert not leaked, f"obsolete entities leaked in as subjects: {leaked}"
