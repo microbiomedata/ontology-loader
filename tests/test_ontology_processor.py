@@ -79,14 +79,12 @@ def test_get_relations_closure():
     "predicates",
     [
         ["rdfs:subClassOf"],
-        # part_of: almost never reflexive in entailed_edge itself (2 self-loops out of 36,857
-        # envo edges, vs subClassOf's 6,906 out of 75,484) -- catches the gap Copilot review found
-        # on this PR, where relying on the table's own reflexivity silently dropped self-pairs.
+        # part_of is almost never reflexive in entailed_edge itself, unlike subClassOf; catches a
+        # method that relies on the table's own reflexivity instead of unioning self-pairs in.
         ["BFO:0000050"],
-        # combined: the production `combined` closure passes both predicates in one call, and
-        # DISTINCT is unconditional specifically so a pair reachable via more than one predicate
-        # is only emitted once -- a single-predicate case can't exercise that cross-predicate
-        # dedup at all. Copilot review on this PR.
+        # The production `combined` closure passes both predicates in one call, and DISTINCT is
+        # unconditional so a pair reachable via more than one predicate is only emitted once; a
+        # single-predicate case can't exercise that cross-predicate dedup.
         ["rdfs:subClassOf", "BFO:0000050"],
     ],
 )
@@ -115,14 +113,13 @@ def test_ancestry_pairs_from_entailed_edge_matches_adapter_ancestors(predicates)
 
     # One bulk query for all sample entities at once -- this is the whole point of the change.
     # Only retain pairs for the sampled subjects: the full closure can be tens of millions of
-    # rows at NCBITaxon scale, and this test only needs 20 of them (Copilot review on this PR).
+    # rows at NCBITaxon scale, and this test only needs 20 of them.
     #
-    # Kept as a list, not deduplicated into the per-subject sets until after the uniqueness
-    # check below: a set would silently swallow a duplicate (subject, object) emission, which is
-    # exactly the shape of bug this test needs to catch (Copilot review on this PR -- an entity
-    # whose self-pair entailed_edge already had natively could otherwise be yielded twice, once
-    # from the SQL scan and once from the explicit reflexive union, or the same pair reached via
-    # two different predicates in the combined case).
+    # Kept as a list, not deduplicated into the per-subject sets until after the uniqueness check
+    # below: a set would silently swallow a duplicate (subject, object) emission, which is exactly
+    # the shape of bug this test needs to catch (an entity whose self-pair entailed_edge already
+    # had natively could otherwise be yielded twice, or the same pair reached via two different
+    # predicates in the combined case).
     pairs = list(processor._ancestry_pairs_from_entailed_edge(predicates, relevant_entities))
     sample_pairs = [(s, o) for s, o in pairs if s in sample_entities_set]
     assert len(sample_pairs) == len(set(sample_pairs)), "duplicate (subject, object) pair emitted"
@@ -148,23 +145,19 @@ def test_ancestry_pairs_from_entailed_edge_excludes_deprecated_subjects():
     The old per-entity loop's start set came from ``self.adapter.entities()``, which defaults to
     ``filter_obsoletes=True`` and so never iterated a deprecated entity in the first place. A bare
     id-prefix match on ``entailed_edge`` does not know about deprecation, and envo's own
-    ``entailed_edge`` does contain rows for deprecated subjects (453 for `rdfs:subClassOf` alone,
-    verified directly against the sqlite file) -- so without filtering against the real entity set,
-    an obsolete class could leak into the closure as a subject.
+    ``entailed_edge`` does contain rows for deprecated subjects -- so without filtering against the
+    real entity set, an obsolete class could leak into the closure as a subject.
 
     Deliberately does not assert the same for objects: the production method preserves the old
     per-entity loop's asymmetry on purpose (subjects checked against ``relevant_entities``, objects
     only prefix-checked), since the old code only ever ontology-prefix-filtered returned ancestors,
     never deprecation-filtered them. Asserting on both would test stricter behavior than what the
-    method actually guarantees. Copilot review on this PR (twice: once for the subject-side gap,
-    once for this test over-asserting on the object side).
+    method actually guarantees.
 
-    Checks *all* obsolete entities, not one arbitrary pick: verified directly that the first
-    obsolete entity oaklib returns for envo (``ENVO:2100001``) has zero rows as a subject in
-    ``entailed_edge`` at all, so a test asserting only on that one would pass whether or not the
-    deprecated-subject filter existed -- 445 of envo's 447 obsolete entities do appear as subjects
-    and are legitimate cases; checking all of them is what actually exercises the filter. Copilot
-    review on this PR.
+    Checks *all* obsolete entities, not one arbitrary pick: the first obsolete entity oaklib
+    returns for envo has zero rows as a subject in ``entailed_edge`` at all, so a test asserting
+    only on that one would pass whether or not the deprecated-subject filter existed; checking all
+    of them is what actually exercises the filter.
     """
     processor = OntologyProcessor("envo", force_refresh=False)
 

@@ -174,46 +174,18 @@ class OntologyProcessor:
         """
         Return every (subject, object) ancestry pair for ``predicates``, from semsql's own table.
 
-        Reads directly from ``entailed_edge`` instead of issuing one ``adapter.ancestors()`` call
-        per entity. The pinned oaklib (``^0.6.16``) SQL adapter's own ``ancestors()`` already
-        queries this same table (``self.session.query(EntailedEdge.object).distinct()``, filtered
-        by subject) -- it does not compute the traversal on the fly, and it already unions in
-        reflexive self-pairs in Python the same way this method does. So the speedup here is not
-        from avoiding recomputation; it is from replacing ~2.7M individual per-entity ``DISTINCT``
-        queries with one bulk ``DISTINCT`` query, cutting the per-call overhead that dominates at
-        that scale. Measured against the real NCBITaxon semsql database: 29m9s (the old per-entity
-        loop, from a real run's own log) versus 13.0s for an unfiltered bulk scan of all
-        51,991,442 rows -- about 134x faster. Correctness verified against the old
-        ``adapter.ancestors()`` output on real envo entities.
-
-        Two corrections found by Copilot review on this PR, both verified against real envo data
-        before fixing:
-
-        - ``entailed_edge`` is *not* reliably reflexive per predicate. ``rdfs:subClassOf`` mostly
-          is (6,906 self-loops out of 75,484 envo edges), but ``BFO:0000050`` (part_of) almost
-          never is (2 out of 36,857) -- so relying on the table's own self-loops, the way the
-          first version of this method did, silently dropped nearly every self-pair for a
-          ``partof`` closure. The old ``adapter.ancestors(..., reflexive=True)`` call guaranteed a
-          self-pair for every entity regardless of the data; self-pairs are now unioned in
-          explicitly here, for the same guarantee.
-        - The SQL-level ``id_prefix`` filter alone is not equivalent to the old entity set. The old
-          loop's start set came from ``self.adapter.entities()``, which excludes deprecated nodes;
-          a bare prefix match does not, and envo's ``entailed_edge`` does contain rows for
-          deprecated subjects (453 for ``rdfs:subClassOf`` alone). Results are now filtered against
-          ``relevant_entities`` -- the same, already-correctly-filtered set the direct-relationship
-          phase uses -- not just the id prefix.
-
-        ``DISTINCT`` is unconditional, not just for multi-predicate closures like ``combined``:
-        the old code deduplicated ancestors per entity via a Python ``set()`` regardless of how
-        many predicates were requested, and a ``combined`` closure can reach the same (subject,
-        object) pair via more than one predicate.
+        Reads ``entailed_edge`` in one bulk query instead of calling ``adapter.ancestors()`` once
+        per entity. ``entailed_edge`` is not reliably reflexive per predicate: every entity in
+        ``relevant_entities`` gets an explicit self-pair, and native self-loop rows are skipped
+        during the scan so a self-pair is never emitted twice. ``DISTINCT`` is unconditional, since
+        a multi-predicate closure can reach the same pair via more than one predicate.
 
         :param predicates: List of predicate CURIEs (e.g. ``["rdfs:subClassOf"]`` or
             ``["rdfs:subClassOf", "BFO:0000050"]``) to include in this closure.
         :param relevant_entities: The exact, non-deprecated subject set for this ontology -- the
             same set ``get_relations_closure`` builds via ``self.adapter.entities()`` before
             calling this method. Used to filter subjects only; objects are filtered by id prefix
-            alone, matching the old per-entity loop's asymmetry (see above).
+            alone, not deprecation, matching the old per-entity loop's behavior.
         :return: Generator of (subject, object) tuples. Subject is always in ``relevant_entities``;
             object is prefix-matched to this ontology but not deprecation-filtered.
         """
@@ -224,48 +196,10 @@ class OntologyProcessor:
             f"WHERE predicate IN ({placeholders}) AND subject LIKE ? AND object LIKE ?"
         )
         params = [*predicates, prefix_pattern, prefix_pattern]
-        # A generator, not fetchall(): NCBITaxon-scale closures are tens of millions of rows, and
-        # materializing that as a Python list would reintroduce the same peak-memory problem this
-        # change exists to avoid, even though the SQL scan itself is fast. The `with` block stays
-        # open across the caller's iteration because a generator suspends at `yield` rather than
-        # returning, keeping the connection alive until the caller is done.
-        #
-        # contextlib.closing(), not sqlite3.Connection's own context manager: verified directly
-        # that sqlite3's __exit__ only commits/rolls back, it does not close the connection, so the
-        # bare `with sqlite3.connect(...) as con` this method used before left the handle open,
-        # relying on implementation-dependent garbage collection to release it eventually -- one
-        # handle per ancestry spec, and not guaranteed at all on non-refcounting runtimes. Found by
-        # Copilot review on this PR.
-        #
-        # The id-prefix LIKE filter still runs in SQL first, but it does not bound a range scan:
-        # verified with EXPLAIN QUERY PLAN against the real entailed_edge table, this query plans
-        # as "SCAN entailed_edge USING COVERING INDEX entailed_edge_spo", a full scan of every row
-        # in the covering index, not a "SEARCH ... (subject>? AND subject<?)" range search. It is
-        # still fast because the index covers every selected column, so SQLite never touches the
-        # base table row; the LIKE predicate is only evaluated as a per-row filter during that
-        # scan, not as an index bound. relevant_entities membership -- exact, already excludes
-        # deprecated nodes -- is the correctness filter on top of that per-row filtering, not a
-        # narrowing of the scan itself. Found by Copilot review on this PR.
-        #
-        # Subjects and objects are filtered differently, on purpose, to match the old code exactly:
-        # the old loop's start set (subjects) came from relevant_entities, but each returned
-        # ancestor (object) was only checked with _matches_ontology -- a prefix match that does not
-        # exclude deprecated nodes. So a non-obsolete entity with a deprecated *ancestor* was
-        # historically included; only a deprecated *subject* never appeared, since the old loop
-        # never iterated one. Checked directly against envo's entailed_edge: zero rows currently
-        # have a non-obsolete subject with a deprecated object, so this has no observed effect
-        # today, but matching the asymmetry exactly costs nothing and removes any doubt for
-        # ontologies not checked here. Found by Copilot review on this PR.
-        #
-        # Self-loop (subject == object) rows are skipped during the scan, then every entity in
-        # relevant_entities gets exactly one self-pair unconditionally afterward -- this is
-        # simpler than tracking which entities entailed_edge already gave a native self-loop (an
-        # earlier version of this method did that, adding a second ontology-sized set on top of
-        # relevant_entities; for NCBITaxon, where subClassOf is nearly always reflexive, that
-        # would have meant millions of extra strings retained in memory, undercutting the point of
-        # this whole change). Skipping native self-loops during the scan loses nothing, since the
-        # unconditional union below already accounts for every entity exactly once. Found by
-        # Copilot review on this PR.
+        # Generator, not fetchall(): NCBITaxon-scale closures are tens of millions of rows. The
+        # `with` block stays open across the caller's iteration because a generator suspends at
+        # `yield` rather than returning; contextlib.closing() is required because
+        # sqlite3.Connection's own context manager only commits/rolls back, it does not close.
         with closing(sqlite3.connect(self.ontology_db_path)) as con:
             for subject, obj in con.execute(query, params):
                 if subject == obj:
