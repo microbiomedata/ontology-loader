@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-01
+
 ### Changed
 - **`oaklib` bumped `^0.6.16` -> `^0.7.4`** (about a year of upstream changes). `pystow` bumped `^0.5.0` -> `^0.7.28` along with it, since oaklib 0.7.4 requires it; checked pystow 0.7.28's requests-backend download path directly (its `utils.py` module became a `utils/` package internally, but `**kwargs` are still passed straight through to `requests.get()`, the exact mechanism issue #59's fix depends on for its custom `User-Agent` header). The `python` requirement narrowed from the open-ended `^3.10` (`>=3.10,<4.0`) to `>=3.10,<3.15`, since oaklib 0.7.4 declares an upper bound poetry's solver won't cross silently. Full suite passes unchanged after both bumps: 66 passed, 12 skipped, 89.25% coverage, identical to before. See https://github.com/microbiomedata/ontology-loader/pull/72.
 
