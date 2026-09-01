@@ -237,10 +237,15 @@ class OntologyProcessor:
         # handle per ancestry spec, and not guaranteed at all on non-refcounting runtimes. Found by
         # Copilot review on this PR.
         #
-        # The id-prefix LIKE filter still runs in SQL first (cheap index range scan, narrows a
-        # 52M-row table down before Python sees anything); relevant_entities membership -- exact,
-        # already excludes deprecated nodes -- is the correctness filter on top of that narrowing,
-        # not a replacement for it.
+        # The id-prefix LIKE filter still runs in SQL first, but it does not bound a range scan:
+        # verified with EXPLAIN QUERY PLAN against the real entailed_edge table, this query plans
+        # as "SCAN entailed_edge USING COVERING INDEX entailed_edge_spo", a full scan of every row
+        # in the covering index, not a "SEARCH ... (subject>? AND subject<?)" range search. It is
+        # still fast because the index covers every selected column, so SQLite never touches the
+        # base table row; the LIKE predicate is only evaluated as a per-row filter during that
+        # scan, not as an index bound. relevant_entities membership -- exact, already excludes
+        # deprecated nodes -- is the correctness filter on top of that per-row filtering, not a
+        # narrowing of the scan itself. Found by Copilot review on this PR.
         #
         # Subjects and objects are filtered differently, on purpose, to match the old code exactly:
         # the old loop's start set (subjects) came from relevant_entities, but each returned
