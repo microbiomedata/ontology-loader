@@ -151,19 +151,26 @@ def test_ancestry_pairs_from_entailed_edge_excludes_deprecated_subjects():
     never deprecation-filtered them. Asserting on both would test stricter behavior than what the
     method actually guarantees. Copilot review on this PR (twice: once for the subject-side gap,
     once for this test over-asserting on the object side).
+
+    Checks *all* obsolete entities, not one arbitrary pick: verified directly that the first
+    obsolete entity oaklib returns for envo (``ENVO:2100001``) has zero rows as a subject in
+    ``entailed_edge`` at all, so a test asserting only on that one would pass whether or not the
+    deprecated-subject filter existed -- 445 of envo's 447 obsolete entities do appear as subjects
+    and are legitimate cases; checking all of them is what actually exercises the filter. Copilot
+    review on this PR.
     """
     processor = OntologyProcessor("envo", force_refresh=False)
 
     obsolete_entities = [e for e in processor.adapter.obsoletes() if processor._matches_ontology(e)]
     assert obsolete_entities, "sanity check: envo should have at least one obsolete class"
-    an_obsolete_entity = obsolete_entities[0]
 
     relevant_entities = set(entity for entity in processor.adapter.entities() if processor._matches_ontology(entity))
-    assert an_obsolete_entity not in relevant_entities, (
+    assert not (set(obsolete_entities) & relevant_entities), (
         "sanity check: obsolete entities excluded from relevant_entities"
     )
 
     pairs = list(processor._ancestry_pairs_from_entailed_edge(["rdfs:subClassOf"], relevant_entities))
 
     subjects = {s for s, _ in pairs}
-    assert an_obsolete_entity not in subjects
+    leaked = subjects & set(obsolete_entities)
+    assert not leaked, f"obsolete entities leaked in as subjects: {leaked}"

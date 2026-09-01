@@ -245,23 +245,23 @@ class OntologyProcessor:
         # today, but matching the asymmetry exactly costs nothing and removes any doubt for
         # ontologies not checked here. Found by Copilot review on this PR.
         #
-        # entities_with_native_self_pair tracks which entities entailed_edge already gave a
-        # self-loop, so the union below doesn't emit a duplicate for them. Bounded by
-        # len(relevant_entities), not by the edge count -- comparable to relevant_entities itself,
-        # not a new large-memory structure. Without this, an entity whose predicate IS reflexive in
-        # entailed_edge (subClassOf usually is) would get its self-pair from the SQL scan AND from
-        # the explicit union below: a real duplicate in the plain-list ontology_relations the
-        # caller appends to, not just a test artifact. Found by Copilot review on this PR.
-        entities_with_native_self_pair = set()
+        # Self-loop (subject == object) rows are skipped during the scan, then every entity in
+        # relevant_entities gets exactly one self-pair unconditionally afterward -- this is
+        # simpler than tracking which entities entailed_edge already gave a native self-loop (an
+        # earlier version of this method did that, adding a second ontology-sized set on top of
+        # relevant_entities; for NCBITaxon, where subClassOf is nearly always reflexive, that
+        # would have meant millions of extra strings retained in memory, undercutting the point of
+        # this whole change). Skipping native self-loops during the scan loses nothing, since the
+        # unconditional union below already accounts for every entity exactly once. Found by
+        # Copilot review on this PR.
         with sqlite3.connect(self.ontology_db_path) as con:
             for subject, obj in con.execute(query, params):
+                if subject == obj:
+                    continue
                 if subject in relevant_entities and self._matches_ontology(obj):
-                    if subject == obj:
-                        entities_with_native_self_pair.add(subject)
                     yield subject, obj
         for entity in relevant_entities:
-            if entity not in entities_with_native_self_pair:
-                yield entity, entity
+            yield entity, entity
 
     def get_terms_and_metadata(self):
         """Retrieve all terms that belong to this ontology and return a list of OntologyClass objects."""
