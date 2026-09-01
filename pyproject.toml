@@ -8,10 +8,12 @@ name = "ontology-loader"
 packages = [{ include = "ontology_loader", from = "src" }]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+# oaklib 0.7.4 declares Python <3.15, so this must be bounded to match instead of the open-ended
+# `^3.10` (>=3.10,<4.0) this project used before -- poetry's own solver rejects the open range.
+python = ">=3.10,<3.15"
 pymongo = "^4.9.1"
 nmdc-schema = "*"
-oaklib = "^0.6.16"
+oaklib = "^0.7.4"
 click = "^8.1.7"
 curies = ">=0.9.1"
 linkml-store = ">=0.2.10"
@@ -19,7 +21,7 @@ tiktoken = "^0.8.0"
 tabulate = "^0.9.0"
 neo4j = "^5.25.0"
 motor = "^3.6.0"
-pystow = "^0.5.0"
+pystow = "^0.7.28"
 
 # setuptools 80.0.0 (April 2025) removed the bundled `pkg_resources/` package.
 # `eutils` (transitive via `oaklib`) still does `import pkg_resources` at
@@ -64,7 +66,7 @@ style = "pep440"
 
 [tool.ruff]
 line-length = 120
-# Match the project's minimum supported Python (declared above as `python = "^3.10"`).
+# Match the project's minimum supported Python (declared above as `python = ">=3.10,<3.15"`).
 # A higher target-version would let Ruff allow/format 3.11+-only syntax that won't run on 3.10.
 target-version = "py310"
 
