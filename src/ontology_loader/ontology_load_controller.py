@@ -188,16 +188,16 @@ class OntologyLoaderController:
             logger.info(f"=== Loading ontology: {source_ontology} (mode={self.mode}, closure={self.closure}) ===")
             processor = OntologyProcessor(source_ontology, force_refresh=force_refresh)
 
-            ontology_classes = processor.get_terms_and_metadata()
-            logger.info(f"Extracted {len(ontology_classes)} ontology classes from {source_ontology}.")
-
-            ontology_relations, ontology_classes_relations = processor.get_relations_closure(
-                closure=self.closure,
-                ontology_terms=ontology_classes,
-            )
-            logger.info(f"Extracted {len(ontology_relations)} ontology relations from {source_ontology}.")
-
             if self.mode == "meticulous":
+                ontology_classes = processor.get_terms_and_metadata()
+                logger.info(f"Extracted {len(ontology_classes)} ontology classes from {source_ontology}.")
+
+                ontology_relations, ontology_classes_relations = processor.get_relations_closure(
+                    closure=self.closure,
+                    ontology_terms=ontology_classes,
+                )
+                logger.info(f"Extracted {len(ontology_relations)} ontology relations from {source_ontology}.")
+
                 updates_report, insertions_report, insert_relations_report = db_manager.upsert_ontology_data(
                     ontology_classes_relations,
                     ontology_relations,
@@ -218,9 +218,12 @@ class OntologyLoaderController:
                     output_directory=report_output_directory,
                 )
             else:  # fast-initial
-                db_manager.insert_ontology_data_fast_initial(
-                    ontology_classes_relations,
-                    ontology_relations,
+                class_count, relation_count = db_manager.insert_ontology_data_fast_initial(
+                    processor.iter_terms_and_metadata(),
+                    processor.iter_relations_closure(closure=self.closure),
+                )
+                logger.info(
+                    f"Inserted {class_count} ontology classes and {relation_count} relations from {source_ontology}."
                 )
 
             logger.info(f"=== Finished {source_ontology} ===")

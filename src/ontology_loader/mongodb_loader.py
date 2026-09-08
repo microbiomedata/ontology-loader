@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import asdict, fields
-from typing import List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 from linkml_runtime import SchemaView
 from linkml_store import Client
@@ -323,12 +323,12 @@ class MongoDBLoader:
 
     def insert_ontology_data_fast_initial(
         self,
-        ontology_classes: List[OntologyClass],
-        ontology_relations: List[OntologyRelation],
+        ontology_classes: Iterable[OntologyClass],
+        ontology_relations: Iterable[OntologyRelation | dict],
         class_collection_name: str = "ontology_class_set",
         relation_collection_name: str = "ontology_relation_set",
         batch_size: int = _FAST_INITIAL_BATCH_SIZE,
-    ):
+    ) -> tuple[int, int]:
         """
         Fast-initial mode: raw pymongo ``insert_many`` with no upsert and no reporting.
 
@@ -349,11 +349,12 @@ class MongoDBLoader:
         NCBITaxon — the actual production driver for this method — only ever loads into an initially-empty
         collection), but if it happens, see the ``OperationFailure`` handling below for what is reported.
 
-        :param ontology_classes: A list of OntologyClass objects to insert.
-        :param ontology_relations: A list of OntologyRelation objects to insert.
+        :param ontology_classes: An iterable of OntologyClass objects to insert.
+        :param ontology_relations: An iterable of OntologyRelation objects or dictionaries to insert.
         :param class_collection_name: MongoDB collection name for ontology classes.
         :param relation_collection_name: MongoDB collection name for ontology relations.
         :param batch_size: Documents per ``insert_many`` call. Default 5000.
+        :return: Inserted class and relation counts, excluding skipped duplicates.
         :raises OperationFailure: if either index build fails because the collection already contains
             duplicate values on the indexed key — this indicates genuinely dirty pre-existing data, not
             something this method can safely repair automatically. Deduplicate the collection first.
@@ -402,6 +403,8 @@ class MongoDBLoader:
             f"Finished fast-initial insert: {class_count} classes ({class_dupes} already present, skipped), "
             f"{relation_count} relations ({relation_dupes} already present, skipped)."
         )
+
+        return class_count, relation_count
 
 
 def _class_to_doc(obj):

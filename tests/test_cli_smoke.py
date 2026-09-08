@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from collections.abc import Iterator
 from unittest.mock import patch
 
 import pytest
@@ -117,6 +118,15 @@ class _FakeOntologyProcessor:
             }
         ]
         return relations, list(ontology_terms or [])
+
+    def iter_terms_and_metadata(self) -> Iterator[OntologyClass]:
+        """Offer the streaming class API used by fast-initial."""
+        yield from self.get_terms_and_metadata()
+
+    def iter_relations_closure(self, closure: str = "combined") -> Iterator[dict]:
+        """Offer the streaming relation API used by fast-initial."""
+        relations, _ = self.get_relations_closure(closure=closure)
+        yield from relations
 
 
 @pytest.mark.skipif(

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- Fast-initial loads now stream classes and relations into insert batches instead of accumulating them. Class documents written by fast-initial have an empty `relations` array; the full relation data remains in `ontology_relation_set`. Meticulous loads retain their existing embedded relations and list-returning APIs. Single-predicate ancestry queries (including NCBITaxon `closure="isa"`) omit redundant `DISTINCT`, avoiding SQLite's temporary deduplication B-tree; multi-predicate queries retain it for cross-predicate deduplication.
+
 ## [0.3.1] - 2026-09-01
 
 ### Changed
