@@ -211,10 +211,12 @@ def test_class_stream_releases_consumed_classes() -> None:
     """Consumed ENVO classes are not kept alive by the class generator."""
     processor = OntologyProcessor("envo", force_refresh=False)
     stream = processor.iter_terms_and_metadata()
-    assert isinstance(stream, Iterator)
-    references = [weakref.ref(next(stream)) for _ in range(100)]
-    assert sum(reference() is not None for reference in references) <= 1
-    stream.close()
+    try:
+        assert isinstance(stream, Iterator)
+        references = [weakref.ref(next(stream)) for _ in range(100)]
+        assert sum(reference() is not None for reference in references) <= 1
+    finally:
+        stream.close()
     assert all(reference() is None for reference in references)
 
 
@@ -233,16 +235,18 @@ def test_relation_stream_does_not_accumulate(closure: str) -> None:
     """
     processor = OntologyProcessor("envo", force_refresh=False)
     stream = processor.iter_relations_closure(closure)
-    assert isinstance(stream, Iterator)
     n = 1000
     tracemalloc.start()
-    assert sum(1 for _ in itertools.islice(stream, n)) == n
-    retained_n, _ = tracemalloc.get_traced_memory()
-    tracemalloc.reset_peak()
-    assert sum(1 for _ in itertools.islice(stream, 9 * n)) == 9 * n
-    retained_10n, peak_10n = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
-    stream.close()
+    try:
+        assert isinstance(stream, Iterator)
+        assert sum(1 for _ in itertools.islice(stream, n)) == n
+        retained_n, _ = tracemalloc.get_traced_memory()
+        tracemalloc.reset_peak()
+        assert sum(1 for _ in itertools.islice(stream, 9 * n)) == 9 * n
+        retained_10n, peak_10n = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+        stream.close()
     assert retained_10n < 2 * retained_n
     assert peak_10n < 2 * retained_n
 
