@@ -116,3 +116,41 @@ def test_fast_initial_rerun_without_clearing_does_not_duplicate(live_mongo_clien
         assert n_rel_2 == n_rel_1, "relations were duplicated on rerun"
     finally:
         live_mongo_client.drop_database(db_name)
+
+
+@pytest.mark.parametrize("batch_size", [1, 3, 20])
+def test_fast_initial_consumes_batches_and_returns_counts(live_mongo_client: MongoClient, batch_size: int) -> None:
+    """Real inserts finish each batch before requesting more generator documents."""
+    from collections.abc import Iterator
+
+    db_name = f"ontology_loader_stream_test_{os.getpid()}"
+    if db_name in live_mongo_client.list_database_names():
+        pytest.fail(f"Scratch database {db_name!r} already exists; refusing to overwrite it")
+    db = live_mongo_client[db_name]
+    class_name = "stream_test_classes"
+    relation_name = "stream_test_relations"
+
+    def classes() -> Iterator[OntologyClass]:
+        """Verify previous class batches are persisted before producing the next one."""
+        for index in range(7):
+            assert db[class_name].count_documents({}) == (index // batch_size) * batch_size
+            yield OntologyClass(id=f"TEST:{index}", type="nmdc:OntologyClass", relations=[])
+
+    def relations() -> Iterator[dict]:
+        """Verify classes and previous relation batches are persisted before advancing."""
+        assert db[class_name].count_documents({}) == 7
+        for index in range(6):
+            assert db[relation_name].count_documents({}) == (index // batch_size) * batch_size
+            yield {"subject": f"TEST:{index}", "predicate": "rdfs:subClassOf", "object": f"TEST:{index + 1}"}
+
+    try:
+        loader = MongoDBLoader(mongo_client=live_mongo_client, db_name=db_name)
+        counts = loader.insert_ontology_data_fast_initial(
+            classes(), relations(), class_name, relation_name, batch_size=batch_size
+        )
+        assert counts == (7, 6)
+        assert db[class_name].count_documents({}) == 7
+        assert db[relation_name].count_documents({}) == 6
+        assert all(document["relations"] == [] for document in db[class_name].find())
+    finally:
+        live_mongo_client.drop_database(db_name)

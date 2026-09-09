@@ -5,7 +5,7 @@ import logging
 import shutil
 import sqlite3
 from contextlib import closing
-from typing import Iterator
+from typing import Iterable, Iterator
 
 import pystow
 from linkml_runtime.dumpers import json_dumper
@@ -33,31 +33,6 @@ _ALL_CLOSURES = ("combined", "isa", "partof")
 # User-facing valid values. `all` and `none` are convenience aliases handled in
 # `_normalize_closure_spec`. Stable order matches the CLI choice list.
 VALID_CLOSURES = ("combined", "isa", "partof", "all", "none")
-
-
-def _create_relation(subject, predicate, obj, ontology_terms_dict):
-    """
-    Create an ontology relation and update related ontology terms.
-
-    :param subject: Subject of the relation
-    :param predicate: Predicate of the relation
-    :param obj: Object of the relation
-    :param ontology_terms_dict: Dictionary of ontology terms for fast lookup
-    :return: Dictionary representation of the relation
-    """
-    ontology_relation = OntologyRelation(
-        subject=subject,
-        predicate=predicate,
-        object=obj,
-        type="nmdc:OntologyRelation",
-    )
-
-    # Update the term's relations list if it exists in our dictionary
-    if subject in ontology_terms_dict:
-        ontology_terms_dict[subject].relations.append(ontology_relation)
-
-    # Convert and return the relation dictionary
-    return json_dumper.to_dict(ontology_relation)
 
 
 class OntologyProcessor:
@@ -168,6 +143,18 @@ class OntologyProcessor:
         head, sep, _ = entity_id.partition(":")
         return bool(sep) and head.lower() == self._ontology_lc
 
+    def _ancestry_query(self, predicates: list[str]) -> tuple[str, list[str]]:
+        """Build the ancestry SQL and parameters, deduplicating only across predicates."""
+        placeholders = ",".join("?" for _ in predicates)
+        prefix_pattern = f"{self._ontology_lc}:%"
+        distinct = "DISTINCT " if len(predicates) > 1 else ""
+        query = (
+            f"SELECT {distinct}subject, object FROM entailed_edge "  # noqa: S608 -- predicates
+            f"WHERE predicate IN ({placeholders}) AND subject LIKE ? AND object LIKE ?"
+        )
+        params = [*predicates, prefix_pattern, prefix_pattern]
+        return query, params
+
     def _ancestry_pairs_from_entailed_edge(
         self, predicates: list[str], relevant_entities: set[str]
     ) -> Iterator[tuple[str, str]]:
@@ -177,8 +164,10 @@ class OntologyProcessor:
         Reads ``entailed_edge`` in one bulk query instead of calling ``adapter.ancestors()`` once
         per entity. ``entailed_edge`` is not reliably reflexive per predicate: every entity in
         ``relevant_entities`` gets an explicit self-pair, and native self-loop rows are skipped
-        during the scan so a self-pair is never emitted twice. ``DISTINCT`` is unconditional, since
-        a multi-predicate closure can reach the same pair via more than one predicate.
+        during the scan so a self-pair is never emitted twice. ``DISTINCT`` is used only for multiple
+        predicates: a single predicate cannot produce a duplicate pair, but multiple predicates
+        can reach the same pair via more than one predicate. Omitting ``DISTINCT`` for a single
+        predicate avoids SQLite building a temporary B-tree of all ancestry pairs.
 
         :param predicates: List of predicate CURIEs (e.g. ``["rdfs:subClassOf"]`` or
             ``["rdfs:subClassOf", "BFO:0000050"]``) to include in this closure.
@@ -189,13 +178,7 @@ class OntologyProcessor:
         :return: Generator of (subject, object) tuples. Subject is always in ``relevant_entities``;
             object is prefix-matched to this ontology but not deprecation-filtered.
         """
-        placeholders = ",".join("?" for _ in predicates)
-        prefix_pattern = f"{self._ontology_lc}:%"
-        query = (
-            f"SELECT DISTINCT subject, object FROM entailed_edge "  # noqa: S608 -- predicates
-            f"WHERE predicate IN ({placeholders}) AND subject LIKE ? AND object LIKE ?"
-        )
-        params = [*predicates, prefix_pattern, prefix_pattern]
+        query, params = self._ancestry_query(predicates)
         # Generator, not fetchall(): NCBITaxon-scale closures are tens of millions of rows. The
         # `with` block stays open across the caller's iteration because a generator suspends at
         # `yield` rather than returning; contextlib.closing() is required because
@@ -209,10 +192,12 @@ class OntologyProcessor:
         for entity in relevant_entities:
             yield entity, entity
 
-    def get_terms_and_metadata(self):
-        """Retrieve all terms that belong to this ontology and return a list of OntologyClass objects."""
-        ontology_classes = []
+    def get_terms_and_metadata(self) -> list[OntologyClass]:
+        """Return all ontology classes as a list for meticulous loading."""
+        return list(self.iter_terms_and_metadata())
 
+    def iter_terms_and_metadata(self) -> Iterator[OntologyClass]:
+        """Yield ontology classes without retaining them or embedding relations."""
         # Process non-obsolete entities
         for entity in tqdm(
             self.adapter.entities(filter_obsoletes=True),
@@ -221,7 +206,7 @@ class OntologyProcessor:
         ):
             if self._matches_ontology(entity):
                 ontology_class = self._create_ontology_class(entity, is_obsolete=False)
-                ontology_classes.append(ontology_class)
+                yield ontology_class
 
         # Process obsolete entities
         for obsolete_entity in tqdm(
@@ -231,11 +216,11 @@ class OntologyProcessor:
         ):
             if self._matches_ontology(obsolete_entity):
                 ontology_class = self._create_ontology_class(obsolete_entity, is_obsolete=True)
-                ontology_classes.append(ontology_class)
+                yield ontology_class
 
-        return ontology_classes
-
-    def get_relations_closure(self, closure="combined", ontology_terms: list = None) -> tuple:
+    def get_relations_closure(
+        self, closure: str | Iterable[str] = "combined", ontology_terms: list[OntologyClass] | None = None
+    ) -> tuple[list[dict], list[OntologyClass]]:
         """
         Retrieve ontology direct relations + ancestry closure for the configured ontology.
 
@@ -253,6 +238,21 @@ class OntologyProcessor:
         :param ontology_terms: List of OntologyClass objects (default: None).
         :return: Tuple of (ontology_relations, updated_ontology_terms).
         """
+        ontology_terms_dict = {term.id: term for term in (ontology_terms or [])}
+        ontology_relations = []
+        for relation in self._iter_relation_objects(closure):
+            if relation.subject in ontology_terms_dict:
+                ontology_terms_dict[relation.subject].relations.append(relation)
+            ontology_relations.append(json_dumper.to_dict(relation))
+        return ontology_relations, list(ontology_terms_dict.values())
+
+    def iter_relations_closure(self, closure: str | Iterable[str] = "combined") -> Iterator[dict]:
+        """Yield relation dictionaries without retaining classes or embedding relations."""
+        for relation in self._iter_relation_objects(closure):
+            yield json_dumper.to_dict(relation)
+
+    def _iter_relation_objects(self, closure: str | Iterable[str]) -> Iterator[OntologyRelation]:
+        """Yield direct and ancestry relations using the same rules for both loading modes."""
         closures = _normalize_closure_spec(closure)
         # Direct relationships: union of all predicates across the requested closures.
         # For 'none' alone, fall back to the combined predicate set so direct relationships still emit.
@@ -268,11 +268,6 @@ class OntologyProcessor:
                 ancestry_specs.append((preds, name))
             direct_predicates = list(direct_predicates_set)
 
-        ontology_relations = []
-
-        # Create dictionary for fast lookup of ontology terms
-        ontology_terms_dict = {term.id: term for term in (ontology_terms or [])}
-
         # Get all relevant entities in one pass
         logger.info("Collecting relevant entities...")
         relevant_entities = set(entity for entity in self.adapter.entities() if self._matches_ontology(entity))
@@ -286,12 +281,12 @@ class OntologyProcessor:
         # Get all relationships at once and filter as we process them
         for subject, predicate, obj in self.adapter.relationships():
             if subject in relevant_entities and predicate in predicate_set:
-                relation_dict = _create_relation(subject, predicate, obj, ontology_terms_dict)
-                ontology_relations.append(relation_dict)
+                yield OntologyRelation(subject=subject, predicate=predicate, object=obj, type="nmdc:OntologyRelation")
                 relationship_count += 1
 
         logger.info(f"Processed {relationship_count} direct relationships")
 
+        ancestry_count = 0
         if not ancestry_specs:
             logger.info("closure='none': skipping ancestry computation.")
         else:
@@ -299,7 +294,6 @@ class OntologyProcessor:
                 f"Processing ancestry relationships across {len(ancestry_specs)} closure type(s): "
                 + ", ".join(name for _, name in ancestry_specs)
             )
-            ancestry_count = 0
             for preds, closure_predicate_name in ancestry_specs:
                 pairs = self._ancestry_pairs_from_entailed_edge(preds, relevant_entities)
                 for subject, obj in tqdm(
@@ -307,15 +301,13 @@ class OntologyProcessor:
                     desc=f"Emitting {self.ontology} {closure_predicate_name}",
                     unit="pair",
                 ):
-                    relation_dict = _create_relation(subject, closure_predicate_name, obj, ontology_terms_dict)
-                    ontology_relations.append(relation_dict)
+                    yield OntologyRelation(
+                        subject=subject, predicate=closure_predicate_name, object=obj, type="nmdc:OntologyRelation"
+                    )
                     ancestry_count += 1
             logger.info(f"Processed {ancestry_count} ancestry relationships")
 
-        logger.info(f"Total relations: {len(ontology_relations)}")
-
-        # Return the relations and updated ontology terms
-        return ontology_relations, list(ontology_terms_dict.values())
+        logger.info(f"Total relations: {relationship_count + ancestry_count}")
 
 
 def _normalize_closure_spec(closure) -> tuple:
