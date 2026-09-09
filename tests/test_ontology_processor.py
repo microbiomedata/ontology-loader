@@ -185,7 +185,17 @@ def test_ancestry_pairs_from_entailed_edge_excludes_deprecated_subjects():
 
 @pytest.mark.parametrize("closure", ["combined", "isa", "partof", "all", "none", ["isa", "partof"]])
 def test_streaming_matches_list_api(closure: str | list[str]) -> None:
-    """Real ENVO streams preserve metadata, relation contents, and meticulous embedding."""
+    """
+    Real ENVO streams preserve metadata, relation contents, and meticulous embedding.
+
+    The comparison is deliberately exact rather than order-normalized. `alternative_names` is
+    built from a set and its order varies with PYTHONHASHSEED across processes, tracked in
+    https://github.com/microbiomedata/ontology-loader/issues/76, but the seed is fixed for the
+    life of a process, so both extractions here observe the same order. Verified against seeds
+    0, 1, 42, 12345 and 99999: zero differing alias lists in every case. Sorting before comparing
+    would hide a real regression in which the streaming API emitted a different order from the
+    list API, which is precisely what this test exists to catch.
+    """
     processor = OntologyProcessor("envo", force_refresh=False)
     classes = processor.get_terms_and_metadata()
     stream = processor.iter_terms_and_metadata()
