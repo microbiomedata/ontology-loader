@@ -155,7 +155,7 @@ class OntologyProcessor:
         https://github.com/INCATools/ontology-access-kit/issues/881
 
         This reproduces the same definition against the semsql views directly.
-        A root is a declared class that is the subject of no ``edge`` row,
+        A root is a declared class with no outgoing relationship,
         ignoring self-edges and ``owl:Thing`` objects, and is not deprecated.
         Deliberately not filtered to this ontology's own prefix: the shipped
         behaviour considers imported parents, so an ENVO term whose only
@@ -166,6 +166,16 @@ class OntologyProcessor:
         subjects are excluded to match ``entities()``. The ``ESCAPE`` clauses
         are load-bearing: an unescaped ``_`` is a single-character wildcard,
         which would also match a one-letter CURIE prefix.
+
+        Include all six sources used by the SQL adapter's non-index relationship
+        path. RBox predicates can apply to class/property-punned subjects too.
+        ``roots()`` supplies no subjects, so neither the subject index's OWL
+        meta-class filter nor reverse equivalent-class traversal applies.
+        In particular, class-valued ``rdf:type`` is not filtered further.
+        Check these extra sources only for candidates surviving the bulk edge
+        exclusion. Expand the ``class_node`` and ``object_property_node``
+        membership checks into indexed declaration lookups: their DISTINCT
+        views otherwise scan all declarations in correlated subqueries.
 
         Verified equal to ``adapter.roots()`` on ENVO, PO, OBI, PATO and
         NCBITaxon. ``test_roots_from_statements_matches_adapter_roots`` pins
@@ -181,6 +191,36 @@ class OntologyProcessor:
               AND declared.subject NOT IN ('owl:Thing', 'owl:Nothing')
               AND declared.subject NOT IN (
                   SELECT parent.subject FROM edge AS parent
+                  WHERE parent.object <> parent.subject
+                    AND parent.object <> 'owl:Thing'
+                    AND parent.object NOT LIKE '\\_:%' ESCAPE '\\'
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM (
+                      SELECT subject, object FROM statements AS relationship
+                      WHERE subject = declared.subject
+                        AND (
+                            (predicate IN ('owl:equivalentClass', 'rdf:type')
+                             AND EXISTS (
+                                 SELECT 1 FROM statements AS object_class
+                                 WHERE object_class.subject = relationship.object
+                                   AND object_class.predicate = 'rdf:type'
+                                   AND object_class.object = 'owl:Class'
+                             ))
+                            OR predicate IN ('rdfs:domain', 'rdfs:range', 'owl:inverseOf')
+                            OR (EXISTS (
+                                SELECT 1 FROM statements AS property
+                                WHERE property.subject = relationship.predicate
+                                  AND property.predicate = 'rdf:type'
+                                  AND property.object = 'owl:ObjectProperty'
+                            ) AND object <> '')
+                        )
+                      UNION ALL
+                      SELECT subclass.subject, restriction.filler AS object
+                      FROM rdfs_subclass_of_statement AS subclass
+                      JOIN owl_has_value AS restriction ON subclass.object = restriction.id
+                      WHERE subclass.subject = declared.subject
+                  ) AS parent
                   WHERE parent.object <> parent.subject
                     AND parent.object <> 'owl:Thing'
                     AND parent.object NOT LIKE '\\_:%' ESCAPE '\\'
