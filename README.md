@@ -252,3 +252,18 @@ db.ontology_relation_set.drop()
 db.ontology_class_set.countDocuments()
 db.ontology_relation_set.countDocuments()
 ```
+
+### Excluding subtrees
+
+Use `--exclude-descendants-of NCBITaxon:6656` to omit the proper
+`rdfs:subClassOf` descendants of Arthropoda while retaining Arthropoda itself
+and its relations to ancestors. Repeat the option for multiple CURIEs; every
+explicitly named term is retained, including nested selections. Exclusion is
+independent of `--closure` and applies in both loading modes to classes and to
+relations with either endpoint excluded. This filters the current load; it does
+not delete documents from an earlier load.
+
+The semsql source is opened read-only by both oaklib and the loader. Closure
+relations are excluded in SQL; classes and oaklib direct relationships use an
+in-memory set of excluded identifiers. Exclusion roots and counts are logged,
+not persisted. Omitting the option preserves the full load.

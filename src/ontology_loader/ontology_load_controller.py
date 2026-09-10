@@ -4,6 +4,7 @@ import logging
 import tempfile
 import warnings
 from pathlib import Path
+from typing import Iterable
 
 from ontology_loader.mongodb_loader import MongoDBLoader
 from ontology_loader.ontology_processor import OntologyProcessor
@@ -67,6 +68,7 @@ class OntologyLoaderController:
         report_directory: str = None,
         mode: str = "meticulous",
         closure="combined",
+        exclude_descendants_of: Iterable[str] = (),
     ):
         """
         Set the parameters for the OntologyLoader.
@@ -82,6 +84,7 @@ class OntologyLoaderController:
         :param mode: ``'meticulous'`` (default) — pure linkml-store, per-item upsert, TSV reports;
             matches 0.2.x behavior. ``'fast-initial'`` — raw pymongo ``insert_many``, no upsert, no reports;
             for first-time installs of large ontologies.
+        :param exclude_descendants_of: CURIEs whose proper subclass descendants are excluded.
         :param closure: Closure spec (string or list of strings) from
             ``{'combined', 'isa', 'partof', 'all', 'none'}``. See ``OntologyProcessor.get_relations_closure``.
         """
@@ -153,6 +156,7 @@ class OntologyLoaderController:
         self.db_name = db_name
         self.mode = mode
         self.closure = closure
+        self.exclude_descendants_of = tuple(exclude_descendants_of)
 
         # Validate that db_name is provided when mongo_client is provided
         if self.mongo_client and not self.db_name:
@@ -186,7 +190,9 @@ class OntologyLoaderController:
 
         for source_ontology in self.source_ontologies:
             logger.info(f"=== Loading ontology: {source_ontology} (mode={self.mode}, closure={self.closure}) ===")
-            processor = OntologyProcessor(source_ontology, force_refresh=force_refresh)
+            processor = OntologyProcessor(
+                source_ontology, force_refresh=force_refresh, exclude_descendants_of=self.exclude_descendants_of
+            )
 
             if self.mode == "meticulous":
                 ontology_classes = processor.get_terms_and_metadata()
