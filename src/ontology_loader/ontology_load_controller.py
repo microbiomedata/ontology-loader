@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 from ontology_loader.mongodb_loader import MongoDBLoader
-from ontology_loader.ontology_processor import OntologyProcessor
+from ontology_loader.ontology_processor import OntologyProcessor, normalize_curie_list
 from ontology_loader.reporter import ReportWriter
 from ontology_loader.utils import load_yaml_from_package
 
@@ -156,7 +156,7 @@ class OntologyLoaderController:
         self.db_name = db_name
         self.mode = mode
         self.closure = closure
-        self.exclude_descendants_of = tuple(exclude_descendants_of)
+        self.exclude_descendants_of = normalize_curie_list(exclude_descendants_of)
 
         # Validate that db_name is provided when mongo_client is provided
         if self.mongo_client and not self.db_name:

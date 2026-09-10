@@ -182,3 +182,71 @@ def test_unfiltered_baseline(processor_type: type[OntologyProcessor], closure: s
     assert baseline["relations"][closure]
     assert classes == baseline["classes"]
     assert relations == baseline["relations"][closure]
+
+
+def test_scalar_curie_is_one_curie_not_characters() -> None:
+    """
+    A bare string must mean one CURIE, not one CURIE per character.
+
+    `str` satisfies `Iterable[str]`, so without normalisation a caller passing a
+    single CURIE gets it iterated character by character. That fails silently:
+    nothing matches, the exclusion set is empty, and the load runs unfiltered.
+    """
+    from ontology_loader.ontology_processor import normalize_curie_list
+
+    # The failure this guards against is real, so assert the naive form differs.
+    assert len(tuple("T:root")) > 1
+    assert normalize_curie_list("T:root") == ("T:root",)
+    assert normalize_curie_list(["T:root", "T:kept"]) == ("T:root", "T:kept")
+    assert normalize_curie_list(["T:root", "T:root"]) == ("T:root",)
+    assert normalize_curie_list(()) == ()
+
+
+def test_cli_forwards_exclusions_all_the_way_to_the_processor(monkeypatch) -> None:
+    """
+    The values must reach the processor, not merely be parsed by the CLI.
+
+    A test that stops at argument parsing cannot catch a dropped hand-off, because
+    the controller fake accepts and ignores keyword arguments, so removing the
+    forwarding would leave the suite green and the CLI would silently do a full load.
+    """
+    from click.testing import CliRunner
+
+    from ontology_loader import cli as cli_module
+    from ontology_loader import ontology_load_controller as controller_module
+
+    seen: dict = {}
+
+    class _Recorder:
+        def __init__(self, *args, **kwargs):
+            seen.update(kwargs)
+
+        def run_ontology_loader(self, *args, **kwargs):
+            return None
+
+    monkeypatch.setattr(controller_module, "OntologyProcessor", _Recorder, raising=False)
+    monkeypatch.setattr(cli_module, "OntologyLoaderController", _Recorder)
+
+    result = CliRunner().invoke(
+        cli_module.cli,
+        ["--source-ontology", "t", "--exclude-descendants-of", "T:root", "--exclude-descendants-of", "T:kept"],
+    )
+    assert result.exit_code == 0, result.output
+    assert seen.get("exclude_descendants_of") == ("T:root", "T:kept"), seen
+
+
+def test_controller_normalizes_a_scalar_curie() -> None:
+    """
+    Constructing the controller must work and must not split a CURIE.
+
+    Constructed for real rather than mocked: an earlier version of this change
+    referenced the normaliser in the controller without importing it, which every
+    mock-based test happily passed while the real call site raised NameError.
+    """
+    from ontology_loader.ontology_load_controller import OntologyLoaderController
+
+    controller = OntologyLoaderController(source_ontology=["envo"], exclude_descendants_of="T:root")
+    assert controller.exclude_descendants_of == ("T:root",)
+
+    controller = OntologyLoaderController(source_ontology=["envo"], exclude_descendants_of=["T:a", "T:b", "T:a"])
+    assert controller.exclude_descendants_of == ("T:a", "T:b")

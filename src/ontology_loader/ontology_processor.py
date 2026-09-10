@@ -37,6 +37,22 @@ _ALL_CLOSURES = ("combined", "isa", "partof")
 VALID_CLOSURES = ("combined", "isa", "partof", "all", "none")
 
 
+def normalize_curie_list(curies: str | Iterable[str]) -> tuple[str, ...]:
+    """
+    Return CURIEs as a deduplicated tuple, treating a bare string as one CURIE.
+
+    ``str`` satisfies ``Iterable[str]``, so a caller passing a single CURIE rather
+    than a sequence would otherwise have it iterated character by character. That
+    fails silently: the placeholders match nothing, the exclusion set is empty, and
+    the load quietly runs unfiltered. Verified before this guard existed:
+    ``exclude_descendants_of="ENVO:01000254"`` excluded 0 terms where the same value
+    in a tuple excluded 400.
+    """
+    if isinstance(curies, str):
+        curies = (curies,)
+    return tuple(dict.fromkeys(curies))
+
+
 class OntologyProcessor:
     """Ontology Processor class to process ontology terms and relations."""
 
@@ -50,7 +66,7 @@ class OntologyProcessor:
             directory for this ontology and re-download from S3. If False, reuse the cached
             artifact when present; pystow.ensure() still downloads if the cache is empty.
         """
-        self.exclude_descendants_of = tuple(dict.fromkeys(exclude_descendants_of))
+        self.exclude_descendants_of = normalize_curie_list(exclude_descendants_of)
         self.ontology = ontology
 
         self.force_refresh = force_refresh
