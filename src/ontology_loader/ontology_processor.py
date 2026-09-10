@@ -58,7 +58,7 @@ class OntologyProcessor:
         self.adapter.precompute_lookups()  # Optimize lookups
 
         # Cache root terms for efficient lookups
-        self.root_terms = set(self.adapter.roots())
+        self.root_terms = self._roots_from_statements()
 
     def download_and_prepare_ontology(self):
         """Download and prepare the ontology database for processing."""
@@ -142,6 +142,53 @@ class OntologyProcessor:
         """Case-insensitive check that ``entity_id`` is a CURIE in this ontology."""
         head, sep, _ = entity_id.partition(":")
         return bool(sep) and head.lower() == self._ontology_lc
+
+    def _roots_from_statements(self) -> set[str]:
+        """
+        Return the same root CURIEs as ``adapter.roots()``, from one SQL query.
+
+        oaklib has no SQL-backed override for ``roots()``, so the naive
+        interface implementation runs: it lists every ``owl:Class``, iterates
+        every relationship in the ontology through the ORM, and discards any
+        class that appears as a subject. On NCBITaxon that costs 462 seconds
+        and 2.86 GB to return three CURIEs. Upstream:
+        https://github.com/INCATools/ontology-access-kit/issues/881
+
+        This reproduces the same definition against the semsql views directly.
+        A root is a declared class that is the subject of no ``edge`` row,
+        ignoring self-edges and ``owl:Thing`` objects, and is not deprecated.
+        Deliberately not filtered to this ontology's own prefix: the shipped
+        behaviour considers imported parents, so an ENVO term whose only
+        parent is a BFO term is not a root, and that is preserved here.
+
+        ``deprecated_node`` is the same view oaklib's ``obsoletes()`` reads,
+        so ``filter_obsoletes=True`` is preserved. Blank nodes and SWRL
+        subjects are excluded to match ``entities()``. The ``ESCAPE`` clauses
+        are load-bearing: an unescaped ``_`` is a single-character wildcard,
+        which would also match a one-letter CURIE prefix.
+
+        Verified equal to ``adapter.roots()`` on ENVO, PO, OBI, PATO and
+        NCBITaxon. ``test_roots_from_statements_matches_adapter_roots`` pins
+        the ENVO case so a divergence fails CI rather than silently
+        mislabelling roots.
+        """
+        query = """
+            SELECT DISTINCT declared.subject
+            FROM statements AS declared
+            WHERE declared.predicate = 'rdf:type' AND declared.object = 'owl:Class'
+              AND declared.subject NOT LIKE '\\_:%' ESCAPE '\\'
+              AND declared.subject NOT LIKE '<urn:swrl%'
+              AND declared.subject NOT IN ('owl:Thing', 'owl:Nothing')
+              AND declared.subject NOT IN (
+                  SELECT parent.subject FROM edge AS parent
+                  WHERE parent.object <> parent.subject
+                    AND parent.object <> 'owl:Thing'
+                    AND parent.object NOT LIKE '\\_:%' ESCAPE '\\'
+              )
+              AND declared.subject NOT IN (SELECT obsolete.id FROM deprecated_node AS obsolete)
+        """
+        with closing(sqlite3.connect(self.ontology_db_path)) as connection:
+            return {subject for (subject,) in connection.execute(query)}
 
     def _ancestry_query(self, predicates: list[str]) -> tuple[str, list[str]]:
         """Build the ancestry SQL and parameters, deduplicating only across predicates."""

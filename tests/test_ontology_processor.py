@@ -58,6 +58,44 @@ def test_ontology_processor():
     assert processor.ontology_db_path.exists()
 
 
+def test_roots_from_statements_matches_adapter_roots() -> None:
+    """
+    The SQL root query must return exactly what oaklib's roots() returns.
+
+    This is the guard on a behaviour change. `is_root` is written to every
+    OntologyClass document, so a divergence here silently mislabels roots
+    across every ontology loaded. ENVO is used because the oaklib call is
+    cheap on it; on NCBITaxon the same call takes 462 seconds.
+    """
+    processor = OntologyProcessor("envo", force_refresh=False)
+    oaklib_roots = set(processor.adapter.roots())
+    sql_roots = processor.root_terms
+
+    declared_classes = set(processor.adapter.entities(owl_type="owl:Class"))
+    # Without these the equality assertion could pass on two empty sets, or on
+    # a query that returns every class.
+    assert sql_roots, "ENVO must yield at least one root"
+    assert len(declared_classes - sql_roots) > len(sql_roots), "roots must be a small minority of classes"
+
+    assert sql_roots == oaklib_roots, (
+        f"SQL roots={len(sql_roots)}, oaklib roots={len(oaklib_roots)}; "
+        f"SQL-only={sorted(sql_roots - oaklib_roots)}; oaklib-only={sorted(oaklib_roots - sql_roots)}"
+    )
+
+
+def test_roots_are_not_filtered_to_the_loaded_ontology() -> None:
+    """
+    Roots include imported terms, because that is what the shipped code did.
+
+    Filtering to the ENVO prefix would be a different, arguably more useful
+    answer, but it is a data change rather than a performance fix. Recorded
+    here so that switching to it is a deliberate act with a failing test.
+    """
+    processor = OntologyProcessor("envo", force_refresh=False)
+    foreign = {curie for curie in processor.root_terms if not processor._matches_ontology(curie)}
+    assert foreign, "expected ENVO's root set to contain imported CURIEs such as BFO:0000001"
+
+
 def test_get_terms_and_metadata():
     """Test retrieval of ontology terms and metadata."""
     processor = OntologyProcessor("envo", force_refresh=False)
