@@ -29,7 +29,7 @@ EXCLUDED_ROOT = "ENVO:01000254"
 
 @pytest.fixture
 def scratch_db():
-    """A throwaway database, dropped afterwards, never a shared collection."""
+    """Yield a throwaway database, dropped afterwards, never a shared collection."""
     client = MongoClient(
         host=os.environ.get("MONGO_HOST", "localhost"),
         port=int(os.environ.get("MONGO_PORT", 27017)),
