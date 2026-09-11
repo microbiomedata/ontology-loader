@@ -299,7 +299,7 @@ class OntologyProcessor:
               )
               AND declared.subject NOT IN (SELECT obsolete.id FROM deprecated_node AS obsolete)
         """
-        with closing(sqlite3.connect(self.ontology_db_path)) as connection:
+        with closing(self._connect_readonly()) as connection:
             return {subject for (subject,) in connection.execute(query)}
 
     def _ancestry_query(self, predicates: list[str]) -> tuple[str, list[str]]:
