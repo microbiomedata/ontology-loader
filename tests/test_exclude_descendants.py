@@ -236,6 +236,15 @@ def test_exclusion_cte_adds_no_temporary_btree(predicates, expects_temp_btree) -
     distinguishes the CTE's own cost from the `DISTINCT` that two predicates
     already require. Without that contrast a passing single-predicate case would
     not show that the CTE is the thing being measured.
+
+    The assertion is deliberately about the absence of a temporary B-tree and
+    not about which strategy SQLite picks instead. That varies by version:
+    3.50.4 builds a bloom filter, while the older library in CI emits
+    `MATERIALIZE excluded`. An earlier version of this test asserted the bloom
+    filter and passed locally while failing in CI. Materialising is acceptable
+    because it is bounded by the size of the exclusion set, hundreds of
+    thousands of identifiers, rather than by the closure, which is 52 million
+    rows on NCBITaxon. The closure is the thing that must never be spilled.
     """
     processor = OntologyProcessor("envo", force_refresh=False, exclude_descendants_of=["ENVO:01000254"])
     query, params = processor._ancestry_query(predicates)
@@ -243,4 +252,5 @@ def test_exclusion_cte_adds_no_temporary_btree(predicates, expects_temp_btree) -
     with closing(sqlite3.connect(processor.ontology_db_path)) as connection:
         plan = [row[3] for row in connection.execute("EXPLAIN QUERY PLAN " + query, params)]
     assert any("TEMP B-TREE" in detail for detail in plan) is expects_temp_btree, plan
-    assert any("BLOOM FILTER" in detail for detail in plan), plan
+    # The CTE must be present in the plan, or the exclusion is not being applied here.
+    assert any("excluded" in detail for detail in plan), plan
