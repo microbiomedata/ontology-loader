@@ -201,9 +201,15 @@ class OntologyProcessor:
               AND declared.subject NOT IN ('owl:Thing', 'owl:Nothing')
               AND declared.subject NOT IN (
                   SELECT parent.subject FROM edge AS parent
-                  WHERE parent.object <> parent.subject
-                    AND parent.object <> 'owl:Thing'
-                    AND parent.object NOT LIKE '\\_:%' ESCAPE '\\'
+                  -- NULL-safe on purpose. semsql keeps literal values in
+                  -- statements.value, so owl_has_value's filler is NULL for a
+                  -- literal restriction. oaklib still emits that relationship
+                  -- (_is_blank(None) is falsy, not an error) and roots() removes
+                  -- the subject. Plain <> against NULL evaluates to unknown,
+                  -- which would drop the row and leave the class a root.
+                  WHERE parent.object IS NOT parent.subject
+                    AND parent.object IS NOT 'owl:Thing'
+                    AND (parent.object IS NULL OR parent.object NOT LIKE '\\_:%' ESCAPE '\\')
               )
               AND NOT EXISTS (
                   SELECT 1 FROM (
@@ -231,9 +237,15 @@ class OntologyProcessor:
                       JOIN owl_has_value AS restriction ON subclass.object = restriction.id
                       WHERE subclass.subject = declared.subject
                   ) AS parent
-                  WHERE parent.object <> parent.subject
-                    AND parent.object <> 'owl:Thing'
-                    AND parent.object NOT LIKE '\\_:%' ESCAPE '\\'
+                  -- NULL-safe on purpose. semsql keeps literal values in
+                  -- statements.value, so owl_has_value's filler is NULL for a
+                  -- literal restriction. oaklib still emits that relationship
+                  -- (_is_blank(None) is falsy, not an error) and roots() removes
+                  -- the subject. Plain <> against NULL evaluates to unknown,
+                  -- which would drop the row and leave the class a root.
+                  WHERE parent.object IS NOT parent.subject
+                    AND parent.object IS NOT 'owl:Thing'
+                    AND (parent.object IS NULL OR parent.object NOT LIKE '\\_:%' ESCAPE '\\')
               )
               AND declared.subject NOT IN (SELECT obsolete.id FROM deprecated_node AS obsolete)
         """

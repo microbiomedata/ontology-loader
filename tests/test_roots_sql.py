@@ -83,3 +83,47 @@ def test_rdf_type_meta_class(roots_database: Path, declare_meta_class: bool) -> 
     assert set(adapter.roots()) == expected
     assert sql_roots(roots_database) == expected
     adapter.session.close()
+
+
+def test_literal_has_value_restriction_removes_the_subject(roots_database: Path) -> None:
+    """
+    A literal owl:hasValue filler is NULL in semsql, and must still count as a relationship.
+
+    semsql keeps literal values in `statements.value`, while the `owl_has_value`
+    view selects `f.object`, so a literal restriction yields a NULL filler.
+    oaklib still emits that relationship: `_is_blank(None)` returns a falsy value
+    rather than raising, so nothing filters it, and `roots()` removes the subject.
+    A SQL comparison against NULL evaluates to unknown, which would silently drop
+    the row from the exclusion set and leave the class marked as a root.
+
+    No ontology in `~/.data/oaklib` exercises this: owl:hasValue appears only in
+    OBI, 141 rows, every one with a named object. Hence a fixture.
+    """
+    add_statements(
+        roots_database,
+        [
+            ("TEST:child", "rdf:type", "owl:Class"),
+            ("TEST:parent", "rdf:type", "owl:Class"),
+            ("TEST:property", "rdf:type", "owl:ObjectProperty"),
+            ("TEST:child", "rdfs:subClassOf", "_:restriction"),
+            ("_:restriction", "owl:onProperty", "TEST:property"),
+        ],
+    )
+    # A LITERAL hasValue: the value column is set and the object column is not.
+    with closing(sqlite3.connect(roots_database)) as connection:
+        connection.execute(
+            "INSERT INTO statements (stanza, subject, predicate, value) VALUES (?, ?, ?, ?)",
+            ("_:restriction", "_:restriction", "owl:hasValue", "some literal"),
+        )
+        connection.commit()
+
+    # The fixture must actually produce the NULL filler this test is about.
+    with closing(sqlite3.connect(roots_database)) as connection:
+        fillers = connection.execute("SELECT filler FROM owl_has_value").fetchall()
+    assert fillers == [(None,)], fillers
+
+    adapter = get_adapter(f"sqlite:{roots_database}")
+    expected = set(adapter.roots())
+    assert "TEST:child" not in expected, "oaklib must treat the literal restriction as a relationship"
+    assert sql_roots(roots_database) == expected
+    adapter.session.close()
