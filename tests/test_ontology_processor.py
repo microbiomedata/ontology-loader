@@ -316,3 +316,23 @@ def test_ancestry_query_plan_uses_temp_btree_only_for_multiple_predicates(
     with closing(sqlite3.connect(processor.ontology_db_path)) as connection:
         plan = [row[3] for row in connection.execute("EXPLAIN QUERY PLAN " + query, params)]
     assert any("TEMP B-TREE" in detail for detail in plan) is expects_temp_btree, plan
+
+
+def test_alternative_names_are_sorted() -> None:
+    """
+    Every class emits `alternative_names` in sorted order, so documents are reproducible.
+
+    oaklib builds the alias list as `list(set(...))`, whose order follows Python's per-process
+    hash randomization, so without sorting the same ontology loaded twice writes different
+    documents and every meticulous run rewrites classes whose content has not changed. See
+    https://github.com/microbiomedata/ontology-loader/issues/76
+
+    The multi-alias count is asserted so this cannot pass vacuously: if `entity_aliases` returned
+    nothing, or returned a single name per class, every list would be trivially sorted and the
+    test would say nothing about ordering.
+    """
+    processor = OntologyProcessor("envo", force_refresh=False)
+    multi_alias = [term for term in processor.iter_terms_and_metadata() if len(term.alternative_names) > 1]
+    assert len(multi_alias) > 100, f"expected many multi-alias ENVO classes, saw {len(multi_alias)}"
+    unsorted = [term.id for term in multi_alias if term.alternative_names != sorted(term.alternative_names)]
+    assert not unsorted, f"alternative_names not sorted for {len(unsorted)} classes, e.g. {unsorted[:5]}"

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+- **Loading the same ontology twice produced different class documents.** `alternative_names` came straight from `adapter.entity_aliases()`, which oaklib builds as `list(set(...))`, so its order followed Python's per-process hash randomization. Measured on ENVO with release 0.3.1: two runs of identical code into separate databases differed in 1,051 of 4,366 class documents, and fixing `PYTHONHASHSEED` made them byte-identical. Because `_upsert_ontology_class` decides what to write by comparing each field against the stored document, a reordered list compares unequal, so the weekly meticulous ENVO, UBERON and PO loads rewrote class documents whose content had not changed. It also made any document-level comparison of a reload noisy by default. `alternative_names` is now sorted. The first meticulous run after this change rewrites that field once for existing documents. This is a local workaround; the root cause is upstream in oaklib and tracked at https://github.com/INCATools/ontology-access-kit/issues/909. See https://github.com/microbiomedata/ontology-loader/issues/76.
+
 ### Changed
 - Fast-initial loads now stream classes and relations into insert batches instead of accumulating them. Class documents written by fast-initial have an empty `relations` array; the full relation data remains in `ontology_relation_set`. Meticulous loads retain their existing embedded relations and list-returning APIs. Single-predicate ancestry queries (including NCBITaxon `closure="isa"`) omit redundant `DISTINCT`, avoiding SQLite's temporary deduplication B-tree; multi-predicate queries retain it for cross-predicate deduplication.
 
