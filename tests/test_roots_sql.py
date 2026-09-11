@@ -127,3 +127,34 @@ def test_literal_has_value_restriction_removes_the_subject(roots_database: Path)
     assert "TEST:child" not in expected, "oaklib must treat the literal restriction as a relationship"
     assert sql_roots(roots_database) == expected
     adapter.session.close()
+
+
+def test_mixed_case_swrl_id_is_kept_like_oaklib_keeps_it(roots_database: Path) -> None:
+    """
+    SQLite LIKE is case-insensitive; oaklib's SWRL check is not.
+
+    oaklib's `entities()` drops SWRL identifiers with
+    `row.id.startswith("<urn:swrl")`, which is case-sensitive, so a declared
+    class named `<URN:SWRLexample` is a candidate and can be a root. A SQL
+    `NOT LIKE '<urn:swrl%'` matches it anyway, because LIKE folds ASCII case,
+    and would silently remove a root that oaklib reports.
+    """
+    add_statements(
+        roots_database,
+        [
+            ("<URN:SWRLexample", "rdf:type", "owl:Class"),
+            ("<urn:swrlexample", "rdf:type", "owl:Class"),
+            ("TEST:plain", "rdf:type", "owl:Class"),
+        ],
+    )
+    # The fixture only means something if the two spellings really differ to LIKE.
+    with closing(sqlite3.connect(roots_database)) as connection:
+        folded = connection.execute("SELECT '<URN:SWRLexample' LIKE '<urn:swrl%'").fetchone()[0]
+    assert folded == 1, "LIKE is expected to fold case here; if not, this test proves nothing"
+
+    adapter = get_adapter(f"sqlite:{roots_database}")
+    expected = set(adapter.roots())
+    assert "<URN:SWRLexample" in expected, "oaklib keeps the mixed-case SWRL id"
+    assert "<urn:swrlexample" not in expected, "oaklib drops the exact-case SWRL id"
+    assert sql_roots(roots_database) == expected
+    adapter.session.close()

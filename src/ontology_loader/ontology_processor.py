@@ -197,7 +197,10 @@ class OntologyProcessor:
             FROM statements AS declared
             WHERE declared.predicate = 'rdf:type' AND declared.object = 'owl:Class'
               AND declared.subject NOT LIKE '\\_:%' ESCAPE '\\'
-              AND declared.subject NOT LIKE '<urn:swrl%'
+              -- GLOB, not LIKE: SQLite's LIKE folds ASCII case, while oaklib's
+              -- entities() drops SWRL ids with a case-sensitive startswith. LIKE
+              -- here would also remove `<URN:SWRLx`, which oaklib keeps as a root.
+              AND declared.subject NOT GLOB '<urn:swrl*'
               AND declared.subject NOT IN ('owl:Thing', 'owl:Nothing')
               AND declared.subject NOT IN (
                   SELECT parent.subject FROM edge AS parent
