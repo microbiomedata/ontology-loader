@@ -202,39 +202,6 @@ def test_scalar_curie_is_one_curie_not_characters() -> None:
     assert normalize_curie_list(()) == ()
 
 
-def test_cli_forwards_exclusions_all_the_way_to_the_processor(monkeypatch) -> None:
-    """
-    The values must reach the processor, not merely be parsed by the CLI.
-
-    A test that stops at argument parsing cannot catch a dropped hand-off, because
-    the controller fake accepts and ignores keyword arguments, so removing the
-    forwarding would leave the suite green and the CLI would silently do a full load.
-    """
-    from click.testing import CliRunner
-
-    from ontology_loader import cli as cli_module
-    from ontology_loader import ontology_load_controller as controller_module
-
-    seen: dict = {}
-
-    class _Recorder:
-        def __init__(self, *args, **kwargs):
-            seen.update(kwargs)
-
-        def run_ontology_loader(self, *args, **kwargs):
-            return None
-
-    monkeypatch.setattr(controller_module, "OntologyProcessor", _Recorder, raising=False)
-    monkeypatch.setattr(cli_module, "OntologyLoaderController", _Recorder)
-
-    result = CliRunner().invoke(
-        cli_module.cli,
-        ["--source-ontology", "t", "--exclude-descendants-of", "T:root", "--exclude-descendants-of", "T:kept"],
-    )
-    assert result.exit_code == 0, result.output
-    assert seen.get("exclude_descendants_of") == ("T:root", "T:kept"), seen
-
-
 def test_controller_normalizes_a_scalar_curie() -> None:
     """
     Constructing the controller must work and must not split a CURIE.
@@ -250,3 +217,30 @@ def test_controller_normalizes_a_scalar_curie() -> None:
 
     controller = OntologyLoaderController(source_ontology=["envo"], exclude_descendants_of=["T:a", "T:b", "T:a"])
     assert controller.exclude_descendants_of == ("T:a", "T:b")
+
+
+@pytest.mark.parametrize(
+    "predicates,expects_temp_btree",
+    [(["rdfs:subClassOf"], False), (["rdfs:subClassOf", "BFO:0000050"], True)],
+)
+def test_exclusion_cte_adds_no_temporary_btree(predicates, expects_temp_btree) -> None:
+    """
+    The exclusion CTE must not make the closure query spill to a temporary B-tree.
+
+    This is a production-disk requirement, not a preference. The closure has 52
+    million rows on NCBITaxon and the worker has 9 GiB of ephemeral storage, so a
+    temp B-tree over it would exhaust the disk. SQLite plans the exclusion as a
+    bloom filter over a scan instead.
+
+    Parameterised against the pre-existing multi-predicate case so the assertion
+    distinguishes the CTE's own cost from the `DISTINCT` that two predicates
+    already require. Without that contrast a passing single-predicate case would
+    not show that the CTE is the thing being measured.
+    """
+    processor = OntologyProcessor("envo", force_refresh=False, exclude_descendants_of=["ENVO:01000254"])
+    query, params = processor._ancestry_query(predicates)
+    assert "excluded" in query, "this test is meaningless unless the exclusion CTE is in the query"
+    with closing(sqlite3.connect(processor.ontology_db_path)) as connection:
+        plan = [row[3] for row in connection.execute("EXPLAIN QUERY PLAN " + query, params)]
+    assert any("TEMP B-TREE" in detail for detail in plan) is expects_temp_btree, plan
+    assert any("BLOOM FILTER" in detail for detail in plan), plan

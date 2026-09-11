@@ -83,12 +83,13 @@ The Docker container networking uses container names (like 'mongo') for internal
 % poetry run ontology_loader --source-ontology envo --source-ontology po --source-ontology uberon
 ```
 
-Four flags:
+Five flags:
 
 - `--source-ontology <name>` — required, repeatable. Lowercase prefix (envo, po, uberon, ncbitaxon, …). Multiple ontologies are processed sequentially in the given order.
 - `--report-directory <dir>` — TSV report destination (only used in `meticulous` mode). Defaults to a fresh temp directory.
 - `--mode {meticulous|fast-initial}` — default `meticulous`. See "Modes" below.
 - `--closure {combined|isa|partof|all|none}` — default `combined`. Repeatable; values combine. `all` and `none` are exclusive.
+- `--exclude-descendants-of <CURIE>` — optional, repeatable. Omits the proper `rdfs:subClassOf` descendants of each CURIE while keeping the CURIE itself. See "Excluding subtrees" below.
 
 ##### Modes
 
