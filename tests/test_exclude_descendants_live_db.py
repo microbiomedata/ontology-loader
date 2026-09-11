@@ -38,6 +38,19 @@ def scratch_db():
         authSource="admin",
     )
     name = f"ontology_loader_exclusion_{uuid.uuid4().hex[:8]}"
+
+    # AGENTS.md rule 2 for DB-writing tests: verify the target does not already
+    # exist before writing. A UUID collision is unlikely, but a leftover from an
+    # interrupted run is not, and this fixture drops the database afterwards.
+    # Fail loudly rather than overwrite and then delete someone's data.
+    if name in client.list_database_names():
+        client.close()
+        pytest.fail(
+            f"scratch database {name!r} already exists on the target MongoDB. "
+            f"Refusing to run to avoid overwriting it. Investigate, then drop it "
+            f"explicitly to re-enable this test."
+        )
+
     try:
         yield client, name
     finally:
