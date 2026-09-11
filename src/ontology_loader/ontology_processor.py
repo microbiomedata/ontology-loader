@@ -169,7 +169,17 @@ class OntologyProcessor:
         ontology_class = OntologyClass(
             id=entity_id,
             type="nmdc:OntologyClass",
-            alternative_names=self.adapter.entity_aliases(entity_id) or [],
+            # sorted() because oaklib builds this list as `list(set(...))`, whose order follows
+            # Python's per-process hash randomization. Without sorting, loading the same ontology
+            # twice writes different documents and every meticulous run rewrites classes whose
+            # content has not changed. See
+            # https://github.com/microbiomedata/ontology-loader/issues/76
+            #
+            # This is a local workaround, not the root fix. The root cause is upstream and tracked
+            # at https://github.com/INCATools/ontology-access-kit/issues/909 . If oaklib starts
+            # returning a deterministic order, this sorted() becomes redundant rather than wrong,
+            # so it can stay until someone confirms the upstream fix has shipped.
+            alternative_names=sorted(self.adapter.entity_aliases(entity_id) or []),
             definition=self.adapter.definition(entity_id) or "",
             relations=[],
             is_root=entity_id in self.root_terms,
