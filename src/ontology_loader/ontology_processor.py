@@ -80,7 +80,7 @@ class OntologyProcessor:
         self.adapter.precompute_lookups()  # Optimize lookups
 
         # Cache root terms for efficient lookups
-        self.root_terms = set(self.adapter.roots())
+        self.root_terms = self._roots_from_statements()
 
     def _connect_readonly(self) -> sqlite3.Connection:
         """Open the semsql source with SQLite-enforced read-only access."""
@@ -199,6 +199,108 @@ class OntologyProcessor:
         """Case-insensitive check that ``entity_id`` is a CURIE in this ontology."""
         head, sep, _ = entity_id.partition(":")
         return bool(sep) and head.lower() == self._ontology_lc
+
+    def _roots_from_statements(self) -> set[str]:
+        """
+        Return the same root CURIEs as ``adapter.roots()``, from one SQL query.
+
+        oaklib has no SQL-backed override for ``roots()``, so the naive
+        interface implementation runs: it lists every ``owl:Class``, iterates
+        every relationship in the ontology through the ORM, and discards any
+        class that appears as a subject. On NCBITaxon that costs 462 seconds
+        and 2.86 GB to return three CURIEs. Upstream:
+        https://github.com/INCATools/ontology-access-kit/issues/881
+
+        This reproduces the same definition against the semsql views directly.
+        A root is a declared class with no outgoing relationship,
+        ignoring self-edges and ``owl:Thing`` objects, and is not deprecated.
+        Deliberately not filtered to this ontology's own prefix: the shipped
+        behaviour considers imported parents, so an ENVO term whose only
+        parent is a BFO term is not a root, and that is preserved here.
+
+        ``deprecated_node`` is the same view oaklib's ``obsoletes()`` reads,
+        so ``filter_obsoletes=True`` is preserved. Blank nodes and SWRL
+        subjects are excluded to match ``entities()``. The ``ESCAPE`` clauses
+        are load-bearing: an unescaped ``_`` is a single-character wildcard,
+        which would also match a one-letter CURIE prefix.
+
+        Include all six sources used by the SQL adapter's non-index relationship
+        path. RBox predicates can apply to class/property-punned subjects too.
+        ``roots()`` supplies no subjects, so neither the subject index's OWL
+        meta-class filter nor reverse equivalent-class traversal applies.
+        In particular, class-valued ``rdf:type`` is not filtered further.
+        Check these extra sources only for candidates surviving the bulk edge
+        exclusion. Expand the ``class_node`` and ``object_property_node``
+        membership checks into indexed declaration lookups: their DISTINCT
+        views otherwise scan all declarations in correlated subqueries.
+
+        Verified equal to ``adapter.roots()`` on ENVO, PO, OBI, PATO and
+        NCBITaxon. ``test_roots_from_statements_matches_adapter_roots`` pins
+        the ENVO case so a divergence fails CI rather than silently
+        mislabelling roots.
+        """
+        query = """
+            SELECT DISTINCT declared.subject
+            FROM statements AS declared
+            WHERE declared.predicate = 'rdf:type' AND declared.object = 'owl:Class'
+              AND declared.subject NOT LIKE '\\_:%' ESCAPE '\\'
+              -- GLOB, not LIKE: SQLite's LIKE folds ASCII case, while oaklib's
+              -- entities() drops SWRL ids with a case-sensitive startswith. LIKE
+              -- here would also remove `<URN:SWRLx`, which oaklib keeps as a root.
+              AND declared.subject NOT GLOB '<urn:swrl*'
+              AND declared.subject NOT IN ('owl:Thing', 'owl:Nothing')
+              AND declared.subject NOT IN (
+                  SELECT parent.subject FROM edge AS parent
+                  -- NULL-safe on purpose. semsql keeps literal values in
+                  -- statements.value, so owl_has_value's filler is NULL for a
+                  -- literal restriction. oaklib still emits that relationship
+                  -- (_is_blank(None) is falsy, not an error) and roots() removes
+                  -- the subject. Plain <> against NULL evaluates to unknown,
+                  -- which would drop the row and leave the class a root.
+                  WHERE parent.object IS NOT parent.subject
+                    AND parent.object IS NOT 'owl:Thing'
+                    AND (parent.object IS NULL OR parent.object NOT LIKE '\\_:%' ESCAPE '\\')
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM (
+                      SELECT subject, object FROM statements AS relationship
+                      WHERE subject = declared.subject
+                        AND (
+                            (predicate IN ('owl:equivalentClass', 'rdf:type')
+                             AND EXISTS (
+                                 SELECT 1 FROM statements AS object_class
+                                 WHERE object_class.subject = relationship.object
+                                   AND object_class.predicate = 'rdf:type'
+                                   AND object_class.object = 'owl:Class'
+                             ))
+                            OR predicate IN ('rdfs:domain', 'rdfs:range', 'owl:inverseOf')
+                            OR (EXISTS (
+                                SELECT 1 FROM statements AS property
+                                WHERE property.subject = relationship.predicate
+                                  AND property.predicate = 'rdf:type'
+                                  AND property.object = 'owl:ObjectProperty'
+                            ) AND object <> '')
+                        )
+                      UNION ALL
+                      SELECT subclass.subject, restriction.filler AS object
+                      FROM rdfs_subclass_of_statement AS subclass
+                      JOIN owl_has_value AS restriction ON subclass.object = restriction.id
+                      WHERE subclass.subject = declared.subject
+                  ) AS parent
+                  -- NULL-safe on purpose. semsql keeps literal values in
+                  -- statements.value, so owl_has_value's filler is NULL for a
+                  -- literal restriction. oaklib still emits that relationship
+                  -- (_is_blank(None) is falsy, not an error) and roots() removes
+                  -- the subject. Plain <> against NULL evaluates to unknown,
+                  -- which would drop the row and leave the class a root.
+                  WHERE parent.object IS NOT parent.subject
+                    AND parent.object IS NOT 'owl:Thing'
+                    AND (parent.object IS NULL OR parent.object NOT LIKE '\\_:%' ESCAPE '\\')
+              )
+              AND declared.subject NOT IN (SELECT obsolete.id FROM deprecated_node AS obsolete)
+        """
+        with closing(sqlite3.connect(self.ontology_db_path)) as connection:
+            return {subject for (subject,) in connection.execute(query)}
 
     def _ancestry_query(self, predicates: list[str]) -> tuple[str, list[str]]:
         """Build the ancestry SQL and parameters, deduplicating only across predicates."""
