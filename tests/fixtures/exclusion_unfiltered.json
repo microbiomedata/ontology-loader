@@ -1,0 +1,623 @@
+{
+  "classes": [
+    "{\n  \"id\": \"T:top\",\n  \"type\": \"nmdc:OntologyClass\",\n  \"name\": \"\",\n  \"alternative_names\": [\n    \"None\"\n  ],\n  \"definition\": \"\",\n  \"is_obsolete\": false,\n  \"is_root\": false,\n  \"@type\": \"OntologyClass\"\n}",
+    "{\n  \"id\": \"T:root\",\n  \"type\": \"nmdc:OntologyClass\",\n  \"name\": \"\",\n  \"alternative_names\": [\n    \"None\"\n  ],\n  \"definition\": \"\",\n  \"is_obsolete\": false,\n  \"is_root\": false,\n  \"@type\": \"OntologyClass\"\n}",
+    "{\n  \"id\": \"T:child\",\n  \"type\": \"nmdc:OntologyClass\",\n  \"name\": \"\",\n  \"alternative_names\": [\n    \"None\"\n  ],\n  \"definition\": \"\",\n  \"is_obsolete\": false,\n  \"is_root\": false,\n  \"@type\": \"OntologyClass\"\n}",
+    "{\n  \"id\": \"T:leaf\",\n  \"type\": \"nmdc:OntologyClass\",\n  \"name\": \"\",\n  \"alternative_names\": [\n    \"None\"\n  ],\n  \"definition\": \"\",\n  \"is_obsolete\": false,\n  \"is_root\": false,\n  \"@type\": \"OntologyClass\"\n}",
+    "{\n  \"id\": \"T:kept\",\n  \"type\": \"nmdc:OntologyClass\",\n  \"name\": \"\",\n  \"alternative_names\": [\n    \"None\"\n  ],\n  \"definition\": \"\",\n  \"is_obsolete\": false,\n  \"is_root\": false,\n  \"@type\": \"OntologyClass\"\n}",
+    "{\n  \"id\": \"T:other\",\n  \"type\": \"nmdc:OntologyClass\",\n  \"name\": \"\",\n  \"alternative_names\": [\n    \"None\"\n  ],\n  \"definition\": \"\",\n  \"is_obsolete\": false,\n  \"is_root\": false,\n  \"@type\": \"OntologyClass\"\n}",
+    "{\n  \"id\": \"T:old\",\n  \"type\": \"nmdc:OntologyClass\",\n  \"name\": \"\",\n  \"alternative_names\": [\n    \"None\"\n  ],\n  \"definition\": \"\",\n  \"is_obsolete\": true,\n  \"is_root\": false,\n  \"@type\": \"OntologyClass\"\n}"
+  ],
+  "relations": {
+    "combined": [
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "BFO:0000050",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:leaf"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:other"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:top",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      }
+    ],
+    "isa": [
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_closure",
+        "object": "T:leaf"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_closure",
+        "object": "T:other"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_isa_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:top",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      }
+    ],
+    "partof": [
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "BFO:0000050",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_partof_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_partof_closure",
+        "object": "T:leaf"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_partof_closure",
+        "object": "T:other"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_partof_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:top",
+        "predicate": "entailed_partof_closure",
+        "object": "T:top"
+      }
+    ],
+    "all": [
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "entailed_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "BFO:0000050",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "entailed_partof_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_closure",
+        "object": "T:leaf"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:leaf"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "entailed_partof_closure",
+        "object": "T:leaf"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_closure",
+        "object": "T:other"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:other"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "entailed_partof_closure",
+        "object": "T:other"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_isa_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "entailed_partof_closure",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:top",
+        "predicate": "entailed_isa_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:top",
+        "predicate": "entailed_isa_partof_closure",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:top",
+        "predicate": "entailed_partof_closure",
+        "object": "T:top"
+      }
+    ],
+    "none": [
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:child",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:root"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "BFO:0000050",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:kept",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:top"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:leaf",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:child"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:other",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:kept"
+      },
+      {
+        "type": "nmdc:OntologyRelation",
+        "subject": "T:root",
+        "predicate": "rdfs:subClassOf",
+        "object": "T:top"
+      }
+    ]
+  }
+}

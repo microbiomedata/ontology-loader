@@ -5,12 +5,14 @@ import logging
 import shutil
 import sqlite3
 from contextlib import closing
+from pathlib import Path
 from typing import Iterable, Iterator
 
 import pystow
 from linkml_runtime.dumpers import json_dumper
 from nmdc_schema.nmdc import OntologyClass, OntologyRelation
-from oaklib import get_adapter
+from oaklib.implementations.sqldb.sql_implementation import SqlImplementation
+from sqlalchemy import create_engine
 from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -35,18 +37,36 @@ _ALL_CLOSURES = ("combined", "isa", "partof")
 VALID_CLOSURES = ("combined", "isa", "partof", "all", "none")
 
 
+def normalize_curie_list(curies: str | Iterable[str]) -> tuple[str, ...]:
+    """
+    Return CURIEs as a deduplicated tuple, treating a bare string as one CURIE.
+
+    ``str`` satisfies ``Iterable[str]``, so a caller passing a single CURIE rather
+    than a sequence would otherwise have it iterated character by character. That
+    fails silently: the placeholders match nothing, the exclusion set is empty, and
+    the load quietly runs unfiltered. Verified before this guard existed:
+    ``exclude_descendants_of="ENVO:01000254"`` excluded 0 terms where the same value
+    in a tuple excluded 400.
+    """
+    if isinstance(curies, str):
+        curies = (curies,)
+    return tuple(dict.fromkeys(curies))
+
+
 class OntologyProcessor:
     """Ontology Processor class to process ontology terms and relations."""
 
-    def __init__(self, ontology: str, force_refresh: bool = True):
+    def __init__(self, ontology: str, force_refresh: bool = True, exclude_descendants_of: Iterable[str] = ()) -> None:
         """
         Initialize the OntologyProcessor with a given SQLite ontology.
 
         :param ontology: The ontology prefix (e.g., "envo", "go", "uberon", etc.)
+        :param exclude_descendants_of: Exclude proper subclass descendants; retain the named roots.
         :param force_refresh: If True (default, preserves 0.2.x behavior), wipe any cached pystow
             directory for this ontology and re-download from S3. If False, reuse the cached
             artifact when present; pystow.ensure() still downloads if the cache is empty.
         """
+        self.exclude_descendants_of = normalize_curie_list(exclude_descendants_of)
         self.ontology = ontology
 
         self.force_refresh = force_refresh
@@ -54,11 +74,38 @@ class OntologyProcessor:
         self._ontology_lc = ontology.lower()
 
         self.ontology_db_path = self.download_and_prepare_ontology()
-        self.adapter = get_adapter(f"sqlite:{self.ontology_db_path}")
+        # Supply the engine so oaklib cannot reopen the source with write access.
+        self.adapter = SqlImplementation(engine=create_engine("sqlite://", creator=self._connect_readonly))
+        self.excluded_entities = self._load_excluded_entities()
         self.adapter.precompute_lookups()  # Optimize lookups
 
         # Cache root terms for efficient lookups
         self.root_terms = self._roots_from_statements()
+
+    def _connect_readonly(self) -> sqlite3.Connection:
+        """Open the semsql source with SQLite-enforced read-only access."""
+        return sqlite3.connect(f"{Path(self.ontology_db_path).resolve().as_uri()}?mode=ro", uri=True)
+
+    def _exclusion_query(self) -> tuple[str, list[str]]:
+        """Select proper subclass descendants, retaining every explicitly named root."""
+        placeholders = ",".join("?" for _ in self.exclude_descendants_of)
+        query = (
+            "SELECT DISTINCT subject FROM entailed_edge "  # noqa: S608 -- only placeholder syntax is interpolated
+            f"WHERE predicate='rdfs:subClassOf' AND object IN ({placeholders}) "
+            "AND subject <> object "
+            f"AND subject NOT IN ({placeholders})"
+        )
+        return query, [*self.exclude_descendants_of, *self.exclude_descendants_of]
+
+    def _load_excluded_entities(self) -> set[str]:
+        """Materialize the exclusion set once for oaklib's entity and direct relation streams."""
+        if not self.exclude_descendants_of:
+            return set()
+        query, params = self._exclusion_query()
+        with closing(self._connect_readonly()) as connection:
+            excluded = {row[0] for row in connection.execute(query, params)}
+        logger.info("Excluding %d proper descendants of %s", len(excluded), self.exclude_descendants_of)
+        return excluded
 
     def download_and_prepare_ontology(self):
         """Download and prepare the ontology database for processing."""
@@ -252,7 +299,7 @@ class OntologyProcessor:
               )
               AND declared.subject NOT IN (SELECT obsolete.id FROM deprecated_node AS obsolete)
         """
-        with closing(sqlite3.connect(self.ontology_db_path)) as connection:
+        with closing(self._connect_readonly()) as connection:
             return {subject for (subject,) in connection.execute(query)}
 
     def _ancestry_query(self, predicates: list[str]) -> tuple[str, list[str]]:
@@ -265,6 +312,16 @@ class OntologyProcessor:
             f"WHERE predicate IN ({placeholders}) AND subject LIKE ? AND object LIKE ?"
         )
         params = [*predicates, prefix_pattern, prefix_pattern]
+        if self.exclude_descendants_of:
+            exclusion_query, exclusion_params = self._exclusion_query()
+            # Drop a relation when EITHER endpoint is excluded, including kept-to-excluded
+            # part_of edges. A subclass-only closure cannot exercise that boundary case.
+            query = (
+                f"WITH excluded AS ({exclusion_query}) {query} "  # noqa: S608 -- composed parameterized SQL
+                "AND subject NOT IN (SELECT subject FROM excluded) "
+                "AND object NOT IN (SELECT subject FROM excluded)"
+            )
+            params = [*exclusion_params, *params]
         return query, params
 
     def _ancestry_pairs_from_entailed_edge(
@@ -295,7 +352,7 @@ class OntologyProcessor:
         # `with` block stays open across the caller's iteration because a generator suspends at
         # `yield` rather than returning; contextlib.closing() is required because
         # sqlite3.Connection's own context manager only commits/rolls back, it does not close.
-        with closing(sqlite3.connect(self.ontology_db_path)) as con:
+        with closing(self._connect_readonly()) as con:
             for subject, obj in con.execute(query, params):
                 if subject == obj:
                     continue
@@ -316,7 +373,8 @@ class OntologyProcessor:
             desc=f"Extracting {self.ontology} classes (non-obsolete)",
             unit="entity",
         ):
-            if self._matches_ontology(entity):
+            # oaklib owns entities(); filter in Python until the SQL rewrite in issue #80.
+            if self._matches_ontology(entity) and entity not in self.excluded_entities:
                 ontology_class = self._create_ontology_class(entity, is_obsolete=False)
                 yield ontology_class
 
@@ -326,7 +384,7 @@ class OntologyProcessor:
             desc=f"Extracting {self.ontology} classes (obsolete)",
             unit="entity",
         ):
-            if self._matches_ontology(obsolete_entity):
+            if self._matches_ontology(obsolete_entity) and obsolete_entity not in self.excluded_entities:
                 ontology_class = self._create_ontology_class(obsolete_entity, is_obsolete=True)
                 yield ontology_class
 
@@ -382,7 +440,11 @@ class OntologyProcessor:
 
         # Get all relevant entities in one pass
         logger.info("Collecting relevant entities...")
-        relevant_entities = set(entity for entity in self.adapter.entities() if self._matches_ontology(entity))
+        relevant_entities = {
+            entity
+            for entity in self.adapter.entities()
+            if self._matches_ontology(entity) and entity not in self.excluded_entities
+        }
         logger.info(f"Found {len(relevant_entities)} relevant entities")
 
         # Process all direct relationships in one batch
@@ -392,7 +454,8 @@ class OntologyProcessor:
 
         # Get all relationships at once and filter as we process them
         for subject, predicate, obj in self.adapter.relationships():
-            if subject in relevant_entities and predicate in predicate_set:
+            # Direct oaklib relations obey the same either-endpoint exclusion rule as SQL.
+            if subject in relevant_entities and obj not in self.excluded_entities and predicate in predicate_set:
                 yield OntologyRelation(subject=subject, predicate=predicate, object=obj, type="nmdc:OntologyRelation")
                 relationship_count += 1
 

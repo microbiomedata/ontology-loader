@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.option(
+    "--exclude-descendants-of",
+    multiple=True,
+    help="Exclude proper rdfs:subClassOf descendants of this CURIE; keep the named term. Repeatable.",
+)
+@click.option(
     "--report-directory",
     default=None,
     help=("Directory for TSV reports (only used when --mode=meticulous). Defaults to the system temp directory."),
@@ -56,7 +61,7 @@ logger = logging.getLogger(__name__)
         "Example: --closure isa --closure partof emits both."
     ),
 )
-def cli(source_ontologies, report_directory, mode, closures):
+def cli(source_ontologies, report_directory, mode, closures, exclude_descendants_of):
     r"""
     Load one or more ontologies into MongoDB.
 
@@ -79,6 +84,7 @@ def cli(source_ontologies, report_directory, mode, closures):
         report_directory=report_directory,
         mode=mode,
         closure=closure_arg,
+        exclude_descendants_of=exclude_descendants_of,
     )
     loader.run_ontology_loader()
 
