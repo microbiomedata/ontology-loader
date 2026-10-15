@@ -87,12 +87,20 @@ def _upsert_ontology_class(obj, collection, ontology_fields):
     report_row = [obj.id] + [getattr(obj, field, "") for field in ontology_fields]
 
     if existing_doc:
-        updated_fields = {
-            key: getattr(obj, key) for key in ontology_fields if getattr(obj, key) != existing_doc.get(key)
-        }
-        if updated_fields:
-            collection.upsert([_class_to_doc(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys()))
-            logging.debug(f"Updated OntologyClass (id={obj.id}): {updated_fields}")
+        # Compare the document that would be written, not the raw object, so fields that
+        # _class_to_doc normalizes (booleans defaulted to False, None left out) are not
+        # reported as changes on every reload.
+        doc = _class_to_doc(obj)
+        changed_fields = [key for key in ontology_fields if key in doc and doc[key] != existing_doc.get(key)]
+        # A field left out of the new document but present in the stored one is removed, so a
+        # value that became None does not linger, and a stored null is cleaned up.
+        removed_fields = [key for key in ontology_fields if key not in doc and key in existing_doc]
+        if changed_fields:
+            collection.upsert([doc], filter_fields=["id"], update_fields=changed_fields)
+        if removed_fields:
+            collection.mongo_collection.update_one({"id": obj.id}, {"$unset": {key: "" for key in removed_fields}})
+        if changed_fields or removed_fields:
+            logging.debug(f"Updated OntologyClass (id={obj.id}): set {changed_fields}, removed {removed_fields}")
             return True, report_row
     else:
         collection.upsert([_class_to_doc(obj)], filter_fields=["id"], update_fields=ontology_fields)

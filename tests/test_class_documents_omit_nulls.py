@@ -89,3 +89,67 @@ def test_stored_class_documents_have_no_null_description(live_mongo_client: Mong
         assert all(document["is_root"] is False and document["is_obsolete"] is False for document in stored)
     finally:
         live_mongo_client.drop_database(db_name)
+
+
+def _scratch_db_name(live_mongo_client: MongoClient, label: str) -> str:
+    """Return a scratch database name that does not exist yet, failing if it does."""
+    db_name = f"ontology_loader_{label}_test_{os.getpid()}"
+    if db_name in live_mongo_client.list_database_names():
+        pytest.fail(f"Scratch database {db_name!r} already exists; refusing to overwrite it")
+    return db_name
+
+
+@pytest.mark.skipif(
+    os.getenv("MONGO_PASSWORD") is None or os.getenv("ENABLE_DB_TESTS") != "true",
+    reason="Skipping test: Requires MONGO_PASSWORD and ENABLE_DB_TESTS=true",
+)
+def test_meticulous_reload_removes_a_cleared_description(live_mongo_client: MongoClient) -> None:
+    """A description that had a value and is now unset is removed from the stored document."""
+    db_name = _scratch_db_name(live_mongo_client, "cleared_field")
+    try:
+        loader = MongoDBLoader(mongo_client=live_mongo_client, db_name=db_name)
+        loader.upsert_ontology_data([_make_class(description="old description")], [])
+        updates, _, _ = loader.upsert_ontology_data([_make_class()], [])
+        stored = live_mongo_client[db_name]["ontology_class_set"].find_one({"id": "TEST:0001"})
+        assert "description" not in stored
+        assert len(updates.records) == 1
+    finally:
+        live_mongo_client.drop_database(db_name)
+
+
+@pytest.mark.skipif(
+    os.getenv("MONGO_PASSWORD") is None or os.getenv("ENABLE_DB_TESTS") != "true",
+    reason="Skipping test: Requires MONGO_PASSWORD and ENABLE_DB_TESTS=true",
+)
+def test_meticulous_reload_removes_a_stored_null_description(live_mongo_client: MongoClient) -> None:
+    """A document stored with description: null, as older releases wrote it, loses that key on reload."""
+    db_name = _scratch_db_name(live_mongo_client, "stored_null")
+    try:
+        loader = MongoDBLoader(mongo_client=live_mongo_client, db_name=db_name)
+        loader.upsert_ontology_data([_make_class()], [])
+        collection = live_mongo_client[db_name]["ontology_class_set"]
+        collection.update_one({"id": "TEST:0001"}, {"$set": {"description": None}})
+        loader.upsert_ontology_data([_make_class()], [])
+        assert "description" not in collection.find_one({"id": "TEST:0001"})
+    finally:
+        live_mongo_client.drop_database(db_name)
+
+
+@pytest.mark.skipif(
+    os.getenv("MONGO_PASSWORD") is None or os.getenv("ENABLE_DB_TESTS") != "true",
+    reason="Skipping test: Requires MONGO_PASSWORD and ENABLE_DB_TESTS=true",
+)
+def test_meticulous_reload_of_unchanged_class_with_unset_booleans_reports_no_update(
+    live_mongo_client: MongoClient,
+) -> None:
+    """Reloading an unchanged class whose booleans are unset is not reported as an update."""
+    db_name = _scratch_db_name(live_mongo_client, "unset_booleans")
+    unchanged = _make_class(is_root=None, is_obsolete=None)
+    try:
+        loader = MongoDBLoader(mongo_client=live_mongo_client, db_name=db_name)
+        loader.upsert_ontology_data([unchanged], [])
+        updates, insertions, _ = loader.upsert_ontology_data([unchanged], [])
+        assert updates.records == []
+        assert insertions.records == []
+    finally:
+        live_mongo_client.drop_database(db_name)
