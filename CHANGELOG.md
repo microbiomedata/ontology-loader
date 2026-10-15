@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+- **Every class document was stored with `description: null`.** Class documents were built with `dataclasses.asdict()`, which emits every field of `OntologyClass`, and the processor never sets `description`. Counted in production on 2026-10-15: all 22,722 `ontology_class_set` documents had it. All class write paths (meticulous insert and update, obsolete-term handling, and fast-initial) now go through `_class_to_doc`, which leaves out fields whose value is `None` and keeps `is_root` and `is_obsolete` at `False` when unset. Empty strings, such as an empty `definition`, are still written. Relations were not affected: they are built with `json_dumper.to_dict()`, which already omits `None`. Documents already stored keep their `null` until they are cleaned up separately; a meticulous reload does not remove it, because an unchanged `None` is not written. See https://github.com/microbiomedata/ontology-loader/issues/91.
+
 ## [0.4.0] - 2026-09-11
 
 ### Added

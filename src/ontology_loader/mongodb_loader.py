@@ -40,7 +40,7 @@ def _handle_obsolete_terms(obsolete_terms, class_collection, relation_collection
         if len(class_collection.find({"id": term_id}).rows) == 1:
             term = class_collection.find({"id": term_id}).rows[0]
             if type(term) is OntologyClass:
-                term = asdict(term)
+                term = _class_to_doc(term)
             term["relations"] = []
             term["is_obsolete"] = True
             class_collection.upsert([term], filter_fields=["id"], update_fields=["is_obsolete", "relations"])
@@ -91,18 +91,11 @@ def _upsert_ontology_class(obj, collection, ontology_fields):
             key: getattr(obj, key) for key in ontology_fields if getattr(obj, key) != existing_doc.get(key)
         }
         if updated_fields:
-            collection.upsert([asdict(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys()))
+            collection.upsert([_class_to_doc(obj)], filter_fields=["id"], update_fields=list(updated_fields.keys()))
             logging.debug(f"Updated OntologyClass (id={obj.id}): {updated_fields}")
             return True, report_row
     else:
-        # Ensure boolean fields are explicitly set to avoid null values in MongoDB
-        doc = asdict(obj)
-        if doc.get("is_root") is None:
-            doc["is_root"] = False
-        if doc.get("is_obsolete") is None:
-            doc["is_obsolete"] = False
-
-        collection.upsert([doc], filter_fields=["id"], update_fields=ontology_fields)
+        collection.upsert([_class_to_doc(obj)], filter_fields=["id"], update_fields=ontology_fields)
         logging.debug(f"Inserted OntologyClass (id={obj.id}).")
         return False, report_row
 
@@ -407,17 +400,18 @@ class MongoDBLoader:
         return class_count, relation_count
 
 
-def _class_to_doc(obj):
+def _class_to_doc(obj: OntologyClass) -> dict:
     """
-    Convert an OntologyClass to a Mongo document, guaranteeing non-null is_root / is_obsolete.
+    Convert an OntologyClass to a Mongo document for every class write path.
 
-    Matches the same shape ``_upsert_ontology_class`` writes in the meticulous path.
+    ``dataclasses.asdict`` emits every field, so unset optional slots such as ``description``
+    would be stored as ``null``. Those keys are left out instead. ``is_root`` and ``is_obsolete``
+    default to ``False`` so they are never missing or null. See
+    https://github.com/microbiomedata/ontology-loader/issues/91
     """
-    doc = asdict(obj)
-    if doc.get("is_root") is None:
-        doc["is_root"] = False
-    if doc.get("is_obsolete") is None:
-        doc["is_obsolete"] = False
+    doc = {key: value for key, value in asdict(obj).items() if value is not None}
+    doc.setdefault("is_root", False)
+    doc.setdefault("is_obsolete", False)
     return doc
 
 
