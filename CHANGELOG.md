@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-04
+
 ### Removed
 - **Five dependencies that nothing in `src/` or `tests/` imports: `tiktoken`, `tabulate`, `neo4j`, `motor` and `curies`.** `tiktoken` was pinned to `^0.8.0`, which has no Python 3.14 support and blocked downstream projects from moving to 3.14. See https://github.com/microbiomedata/ontology-loader/issues/93. `tiktoken`, `neo4j` and `motor` are no longer installed at all; `tabulate` and `curies` still arrive through `linkml-store` and other dependencies.
 - **The `setuptools<80` pin.** It existed because `eutils`, which `oaklib` imports, did `import pkg_resources` through 0.6.0. `eutils` 0.6.1 dropped that import, so it is now required instead. See https://github.com/microbiomedata/ontology-loader/issues/42.
