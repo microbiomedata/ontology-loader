@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
       - name: Install tox
         run: pipx install tox
@@ -35,10 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Aligned with pyproject.toml's `python = "^3.10"`. 3.9 was previously
-        # in the matrix despite the project not declaring support for it;
-        # coverage's 3.10+ requirement made that mismatch surface.
-        python-version: [ '3.10', '3.11', '3.12' ]
+        # Aligned with pyproject.toml's `python = ">=3.12,<3.15"`.
+        python-version: [ '3.12', '3.13', '3.14' ]
 
     services:
       # Spin up a MongoDB the live-DB tests can connect to. The host port is

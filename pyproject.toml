@@ -8,27 +8,30 @@ name = "ontology-loader"
 packages = [{ include = "ontology_loader", from = "src" }]
 
 [tool.poetry.dependencies]
-# oaklib 0.7.4 declares Python <3.15, so this must be bounded to match instead of the open-ended
-# `^3.10` (>=3.10,<4.0) this project used before -- poetry's own solver rejects the open range.
-python = ">=3.10,<3.15"
-pymongo = "^4.9.1"
-nmdc-schema = "*"
+# oaklib 0.7.4 declares Python <3.15, so this must be bounded to match instead of an open-ended
+# range -- poetry's own solver rejects it. The floor is 3.12 because eutils 0.6.1 (below) requires it,
+# and nmdc-runtime, the main consumer, already requires 3.12.
+python = ">=3.12,<3.15"
+# Floors below are the lowest versions the test suite passes with on Python 3.12-3.14
+# (`uv lock --resolution lowest-direct`). linkml-store 0.2.x requires pystow <0.6, which oaklib 0.7.4
+# rules out, so 0.3.0 is the real floor, and it requires pymongo >=4.11.
+pymongo = ">=4.11,<5.0.0"
+# OntologyClass gained `is_root` and `is_obsolete` in 11.5.0. 11.5.x-11.6.x pin linkml-runtime 1.8.3,
+# which fails to import on Python 3.13+, so 11.7.0 is the first release that works across the range.
+nmdc-schema = ">=11.7.0"
 oaklib = "^0.7.4"
 click = "^8.1.7"
-curies = ">=0.9.1"
-linkml-store = ">=0.2.10"
-tiktoken = "^0.8.0"
-tabulate = "^0.9.0"
-neo4j = "^5.25.0"
-motor = "^3.6.0"
+linkml-store = ">=0.3.0"
 pystow = "^0.7.28"
+# Imported directly in src/, so declared rather than relied on through linkml-store and oaklib.
+linkml-runtime = ">=1.9.1"
+sqlalchemy = ">=1.4.32"
 
-# setuptools 80.0.0 (April 2025) removed the bundled `pkg_resources/` package.
-# `eutils` (transitive via `oaklib`) still does `import pkg_resources` at
-# module load time and breaks on setuptools >= 80. Pin until eutils migrates
-# to `importlib.metadata`. See #42.
-setuptools = "<80"
-tqdm = "^4.67.3"
+# `eutils` (transitive via `oaklib`) imports `pkg_resources` at module load through 0.6.0, which
+# setuptools 80 removed (#42). 0.6.1 dropped that import, so require it instead of capping setuptools.
+eutils = ">=0.6.1"
+# 4.66.3 fixes CVE-2024-34062.
+tqdm = ">=4.66.3,<5.0.0"
 
 [tool.poetry.group.dev.dependencies]
 # pytest/tox/pytest-cov are only imported from tests/ and tox.ini, never from src/, so this direct
@@ -66,9 +69,9 @@ style = "pep440"
 
 [tool.ruff]
 line-length = 120
-# Match the project's minimum supported Python (declared above as `python = ">=3.10,<3.15"`).
-# A higher target-version would let Ruff allow/format 3.11+-only syntax that won't run on 3.10.
-target-version = "py310"
+# Match the project's minimum supported Python (declared above as `python = ">=3.12,<3.15"`).
+# A higher target-version would let Ruff allow/format 3.13+-only syntax that won't run on 3.12.
+target-version = "py312"
 
 [tool.ruff.lint]
 extend-ignore = [
