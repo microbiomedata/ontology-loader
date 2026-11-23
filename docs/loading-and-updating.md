@@ -57,9 +57,11 @@ Running in `meticulous` mode deletes the cached source and downloads it again. R
 
 ## The same ontologies in the KBase lakehouse
 
-The data lakehouse that KBase runs, K-BERDL (https://hub.berdl.kbase.us), already holds NCBITaxon, ENVO, UBERON and PO as semsql tables (`statements`, `entailed_edge` and `prefix`) in `refdata.ontology_source` and `kbase.ontology_source`. The BRIDGE lakehouse will likely get the same tables. If the NMDC applications that read ontology terms could read them from a lakehouse instead, NMDC would no longer need this loader or the MongoDB copies it writes.
+The data lakehouse that KBase runs, K-BERDL (https://hub.berdl.kbase.us), already holds NCBITaxon, ENVO, UBERON and PO as semsql tables (`statements`, `entailed_edge` and `prefix`) in `refdata.ontology_source` and `kbase.ontology_source`. The BRIDGE lakehouse will likely get the same tables.
 
-Not yet known: which code loads these tables into K-BERDL, which ontology release they hold, and which NMDC applications read `ontology_class_set` and `ontology_relation_set` today.
+The only NMDC application that reads `ontology_class_set` and `ontology_relation_set` in production is the NMDC data portal (https://github.com/microbiomedata/nmdc-server). During its data load, the portal copies both collections into its own PostgreSQL database and builds the ENVO term tree behind its environment search filters from them (https://github.com/microbiomedata/nmdc-server/blob/835d61e7fc929212a4cd81836bafcd12aeaa1154/nmdc_server/ingest/all.py#L73-L77). If the portal built that tree from the lakehouse tables instead, NMDC would no longer need this loader or the MongoDB copies it writes.
+
+Not yet known: which code loads the K-BERDL tables, and which ontology releases they hold. The tables don't record a release for any of these four ontologies.
 
 ## Known gaps
 
