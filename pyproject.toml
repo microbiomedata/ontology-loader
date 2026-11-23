@@ -8,18 +8,20 @@ name = "ontology-loader"
 packages = [{ include = "ontology_loader", from = "src" }]
 
 [tool.poetry.dependencies]
-# oaklib 0.7.4 declares Python <3.15, so this must be bounded to match instead of an open-ended
-# range -- poetry's own solver rejects it. The floor is 3.12 because eutils 0.6.1 (below) requires it,
-# and nmdc-runtime, the main consumer, already requires 3.12.
+# oaklib 0.7.5 declares Python <3.15, so this must be bounded to match instead of an open-ended
+# range -- poetry's own solver rejects it. The floor is 3.12 because nmdc-runtime, the main consumer,
+# requires 3.12.
 python = ">=3.12,<3.15"
 # Floors below are the lowest versions the test suite passes with on Python 3.12-3.14
-# (`uv lock --resolution lowest-direct`). linkml-store 0.2.x requires pystow <0.6, which oaklib 0.7.4
+# (`uv lock --resolution lowest-direct`). linkml-store 0.2.x requires pystow <0.6, which oaklib 0.7.5
 # rules out, so 0.3.0 is the real floor, and it requires pymongo >=4.11.
 pymongo = ">=4.11,<5.0.0"
 # OntologyClass gained `is_root` and `is_obsolete` in 11.5.0. 11.5.x-11.6.x pin linkml-runtime 1.8.3,
 # which fails to import on Python 3.13+, so 11.7.0 is the first release that works across the range.
 nmdc-schema = ">=11.7.0"
-oaklib = "^0.7.4"
+# 0.7.5 drops oaklib's dependency on `eutils` and with it the `setuptools<82` cap, so setuptools can
+# move to releases that fix its security advisories.
+oaklib = "^0.7.5"
 click = "^8.1.7"
 linkml-store = ">=0.3.0"
 pystow = "^0.7.28"
@@ -27,9 +29,6 @@ pystow = "^0.7.28"
 linkml-runtime = ">=1.9.1"
 sqlalchemy = ">=1.4.32"
 
-# `eutils` (transitive via `oaklib`) imports `pkg_resources` at module load through 0.6.0, which
-# setuptools 80 removed (#42). 0.6.1 dropped that import, so require it instead of capping setuptools.
-eutils = ">=0.6.1"
 # 4.66.3 fixes CVE-2024-34062.
 tqdm = ">=4.66.3,<5.0.0"
 
