@@ -18,7 +18,7 @@ Single-predicate closures such as `isa` skip SQLite's temporary deduplication B-
 
 ## Load into a local MongoDB
 
-Set the connection explicitly. The loader's default port is 27022 and its default database is `nmdc`, and neither is right for a local trial. Set the password through your credential manager, not in a committed file or on the command line.
+Set the connection explicitly. The loader's default port is 27022 and its default database is `nmdc`, and neither is necessarily right for a local trial. Set `MONGO_PASSWORD` in your environment without writing it into a committed file or onto the command line.
 
 After checking that `ontology_ncbitaxon_trial` doesn't already exist:
 
@@ -53,7 +53,7 @@ For a local trial, load into a new database and check it before switching reader
 
 ## Source freshness depends on the mode
 
-Meticulous deletes the cached source and downloads it again. Fast-initial reuses the cached source and downloads only when it's missing. There's no separate refresh option, so deleting the MongoDB documents and running fast-initial can reload the same old snapshot. To reload a new release with fast-initial, first delete the ontology's whole pystow cache directory (by default `~/.pystow/<ontology>`), not only the `.db.gz` file, because the loader reuses an already-extracted `.db` file. Then check the new file's `owl:versionIRI` before deleting any MongoDB documents.
+Running in `meticulous` mode deletes the cached source and downloads it again. Running in `fast-initial` mode reuses the cached source and downloads it only when it's missing. There's no separate refresh option, so deleting the MongoDB documents and running `fast-initial` can reload the same old snapshot. To reload a new release with `fast-initial`, first delete the ontology's whole pystow cache directory (by default `~/.pystow/<ontology>`), not only the `.db.gz` file, because the loader reuses an already-extracted `.db` file. Then check the new file's `owl:versionIRI` before deleting any MongoDB documents.
 
 ## The same ontologies in the KBase lakehouse
 
