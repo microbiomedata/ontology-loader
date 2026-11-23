@@ -1,0 +1,192 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loading and updating ontologies &mdash; ontology-loader 0.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/sphinx_autodoc_typehints.css?v=057ac668" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            ontology-loader
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">ontology_loader</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ontology-loader</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Loading and updating ontologies</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/loading-and-updating.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="loading-and-updating-ontologies">
+<h1>Loading and updating ontologies<a class="headerlink" href="#loading-and-updating-ontologies" title="Link to this heading"></a></h1>
+<p>The loader reads an ontology from a SQLite database built by Semantic SQL (semsql, https://github.com/INCATools/semantic-sql) and writes NMDC schema (https://github.com/microbiomedata/nmdc-schema) <code class="docutils literal notranslate"><span class="pre">OntologyClass</span></code> and <code class="docutils literal notranslate"><span class="pre">OntologyRelation</span></code> documents to MongoDB’s <code class="docutils literal notranslate"><span class="pre">ontology_class_set</span></code> and <code class="docutils literal notranslate"><span class="pre">ontology_relation_set</span></code>. It does not copy semsql tables into MongoDB. NMDC loads four ontologies this way: NCBITaxon (https://obofoundry.org/ontology/ncbitaxon.html), ENVO (https://obofoundry.org/ontology/envo.html), UBERON (https://obofoundry.org/ontology/uberon.html) and PO (https://obofoundry.org/ontology/po.html).</p>
+<section id="choose-a-mode-and-closure">
+<h2>Choose a mode and closure<a class="headerlink" href="#choose-a-mode-and-closure" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Operation</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">--source-ontology</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">--mode</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">--closure</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>First NCBITaxon load, or a retry of the same snapshot</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ncbitaxon</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fast-initial</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">isa</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Replace NCBITaxon with a new snapshot</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ncbitaxon</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fast-initial</span></code>, after removing the old contents</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">isa</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>First load or routine update of ENVO, UBERON or PO</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">envo</span></code>, <code class="docutils literal notranslate"><span class="pre">uberon</span></code>, <code class="docutils literal notranslate"><span class="pre">po</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">meticulous</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">combined</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>The closure setting decides which ancestor relations are written for each class. <code class="docutils literal notranslate"><span class="pre">isa</span></code> writes <code class="docutils literal notranslate"><span class="pre">entailed_isa_closure</span></code>. NCBITaxon has no <code class="docutils literal notranslate"><span class="pre">part_of</span></code> edges in the snapshot tested. <code class="docutils literal notranslate"><span class="pre">combined</span></code> writes <code class="docutils literal notranslate"><span class="pre">entailed_isa_partof_closure</span></code>, which follows both <code class="docutils literal notranslate"><span class="pre">rdfs:subClassOf</span></code> (is a) and <code class="docutils literal notranslate"><span class="pre">BFO:0000050</span></code> (part of). Direct relations are written in every case. <code class="docutils literal notranslate"><span class="pre">all</span></code> writes several closure predicates and isn’t needed for these loads.</p>
+<p><code class="docutils literal notranslate"><span class="pre">--exclude-descendants-of</span> <span class="pre">&lt;CURIE&gt;</span></code>, repeatable, leaves out the <code class="docutils literal notranslate"><span class="pre">rdfs:subClassOf</span></code> descendants of a term and keeps the term itself. Excluding <code class="docutils literal notranslate"><span class="pre">NCBITaxon:6656</span></code> (Arthropoda) cuts an NCBITaxon load from 4.34 GB to 2.12 GB on disk, because arthropods are 49.6 percent of the ancestry closure. The option filters only the current load. It doesn’t delete documents that an earlier load stored, so getting the smaller collections needs an empty target database.</p>
+</section>
+<section id="load-into-a-local-mongodb">
+<h2>Load into a local MongoDB<a class="headerlink" href="#load-into-a-local-mongodb" title="Link to this heading"></a></h2>
+<p>Set the connection explicitly. The loader’s default port is 27022 and its default database is <code class="docutils literal notranslate"><span class="pre">nmdc</span></code>, and neither is necessarily right for a local trial. Set <code class="docutils literal notranslate"><span class="pre">MONGO_PASSWORD</span></code> in your environment without writing it into a committed file or onto the command line.</p>
+<p>After checking that <code class="docutils literal notranslate"><span class="pre">ontology_ncbitaxon_trial</span></code> doesn’t already exist:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">MONGO_HOST</span><span class="o">=</span>localhost
+<span class="nb">export</span><span class="w"> </span><span class="nv">MONGO_PORT</span><span class="o">=</span><span class="m">27017</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">MONGO_USERNAME</span><span class="o">=</span>admin
+<span class="nb">export</span><span class="w"> </span><span class="nv">MONGO_DB</span><span class="o">=</span>ontology_ncbitaxon_trial
+<span class="c1"># Set MONGO_PASSWORD before running the loader.</span>
+poetry<span class="w"> </span>run<span class="w"> </span>ontology_loader<span class="w"> </span>--source-ontology<span class="w"> </span>ncbitaxon<span class="w"> </span>--mode<span class="w"> </span>fast-initial<span class="w"> </span>--closure<span class="w"> </span>isa
+</pre></div>
+</div>
+<p>Fast-initial streams documents in batches of 5,000. Its class documents have <code class="docutils literal notranslate"><span class="pre">relations=[]</span></code>, so read relations from <code class="docutils literal notranslate"><span class="pre">ontology_relation_set</span></code>. Meticulous mode embeds relations in class documents and writes TSV reports.</p>
+<p>ENVO, UBERON and PO can run in one command because they use the same mode and closure:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>ontology_loader<span class="w"> </span>--source-ontology<span class="w"> </span>envo<span class="w"> </span>--source-ontology<span class="w"> </span>uberon<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-ontology<span class="w"> </span>po<span class="w"> </span>--mode<span class="w"> </span>meticulous<span class="w"> </span>--closure<span class="w"> </span>combined<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--report-directory<span class="w"> </span>./ontology-reports
+</pre></div>
+</div>
+<p>Each ontology gets its own report subdirectory. Run NCBITaxon separately.</p>
+</section>
+<section id="retry-update-and-replace">
+<h2>Retry, update and replace<a class="headerlink" href="#retry-update-and-replace" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Retry a snapshot with <code class="docutils literal notranslate"><span class="pre">fast-initial</span></code>. It skips class IDs and relation triples that already exist and inserts the missing ones, so it can finish a partial load without duplicates. It doesn’t update existing labels or definitions, so if the source changed between runs the result mixes snapshots.</p></li>
+<li><p>Update with <code class="docutils literal notranslate"><span class="pre">meticulous</span></code>. It inserts and updates class documents and relation triples, handles obsolete classes, and writes reports. It doesn’t delete a relation that disappeared from the new source, so MongoDB won’t exactly mirror the source.</p></li>
+<li><p>Replace by removing the old contents and then running <code class="docutils literal notranslate"><span class="pre">fast-initial</span></code>. The loader doesn’t clear collections itself. https://github.com/microbiomedata/nmdc-runtime/pull/1562 proposes a scoped delete followed by a fast-initial reload. The data is missing or partial until the reload finishes. Check each ontology before deleting its documents by ID prefix, because one ontology’s load can include terms from another ontology.</p></li>
+</ul>
+<p>For a local trial, load into a new database and check it before switching readers to it. That keeps the previous snapshot. The loader doesn’t switch readers.</p>
+</section>
+<section id="source-freshness-depends-on-the-mode">
+<h2>Source freshness depends on the mode<a class="headerlink" href="#source-freshness-depends-on-the-mode" title="Link to this heading"></a></h2>
+<p>Running in <code class="docutils literal notranslate"><span class="pre">meticulous</span></code> mode deletes the cached source and downloads it again. Running in <code class="docutils literal notranslate"><span class="pre">fast-initial</span></code> mode reuses the cached source and downloads it only when it’s missing. There’s no separate refresh option, so deleting the MongoDB documents and running <code class="docutils literal notranslate"><span class="pre">fast-initial</span></code> can reload the same old snapshot. To reload a new release with <code class="docutils literal notranslate"><span class="pre">fast-initial</span></code>, first delete the ontology’s whole cache directory (by default <code class="docutils literal notranslate"><span class="pre">~/.pystow/&lt;ontology&gt;</span></code>, managed by pystow, https://github.com/cthoyt/pystow), not only the <code class="docutils literal notranslate"><span class="pre">.db.gz</span></code> file, because the loader reuses an already-extracted <code class="docutils literal notranslate"><span class="pre">.db</span></code> file. Then check the new file’s <code class="docutils literal notranslate"><span class="pre">owl:versionIRI</span></code> before deleting any MongoDB documents.</p>
+</section>
+<section id="the-same-ontologies-in-the-kbase-lakehouse">
+<h2>The same ontologies in the KBase lakehouse<a class="headerlink" href="#the-same-ontologies-in-the-kbase-lakehouse" title="Link to this heading"></a></h2>
+<p>The data lakehouse that KBase runs, K-BERDL (https://hub.berdl.kbase.us), already holds NCBITaxon, ENVO, UBERON and PO as semsql tables (<code class="docutils literal notranslate"><span class="pre">statements</span></code>, <code class="docutils literal notranslate"><span class="pre">entailed_edge</span></code> and <code class="docutils literal notranslate"><span class="pre">prefix</span></code>) in <code class="docutils literal notranslate"><span class="pre">refdata.ontology_source</span></code> and <code class="docutils literal notranslate"><span class="pre">kbase.ontology_source</span></code>. The BRIDGE lakehouse will likely get the same tables.</p>
+<p>The only NMDC application that reads <code class="docutils literal notranslate"><span class="pre">ontology_class_set</span></code> and <code class="docutils literal notranslate"><span class="pre">ontology_relation_set</span></code> in production is the NMDC data portal (https://github.com/microbiomedata/nmdc-server). During its data load, the portal copies both collections into its own PostgreSQL database and builds the ENVO term tree behind its environment search filters from them (https://github.com/microbiomedata/nmdc-server/blob/835d61e7fc929212a4cd81836bafcd12aeaa1154/nmdc_server/ingest/all.py#L73-L77). If the portal built that tree from the lakehouse tables instead, NMDC would no longer need this loader or the MongoDB copies it writes.</p>
+<p>Not yet known: which code loads the K-BERDL tables, and which ontology releases they hold. The tables don’t record a release for any of these four ontologies.</p>
+</section>
+<section id="known-gaps">
+<h2>Known gaps<a class="headerlink" href="#known-gaps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Nothing records which ontology release a load came from, or whether it was subsetted. A subsetted load and one that failed partway look the same. https://github.com/microbiomedata/ontology-loader/issues/81</p></li>
+<li><p>Refreshing the source is tied to the mode. https://github.com/microbiomedata/ontology-loader/issues/13</p></li>
+<li><p>Class documents differ by mode: meticulous embeds relations and fast-initial doesn’t. https://github.com/microbiomedata/ontology-loader/issues/78</p></li>
+<li><p>The deprecated <code class="docutils literal notranslate"><span class="pre">generate_reports=False</span></code> argument now selects fast-initial, which skips updates to existing documents. https://github.com/microbiomedata/ontology-loader/issues/96</p></li>
+<li><p>Peak memory isn’t explained, so it’s unknown how close an NCBITaxon load comes to the 12 GiB memory limit of the nmdc-runtime job that runs the loader. https://github.com/microbiomedata/ontology-loader/issues/87</p></li>
+<li><p>How nmdc-runtime (https://github.com/microbiomedata/nmdc-runtime) should order and retry fast-initial reloads isn’t settled. https://github.com/microbiomedata/nmdc-runtime/issues/1565</p></li>
+</ul>
+</section>
+<section id="ncbitaxon-size">
+<h2>NCBITaxon size<a class="headerlink" href="#ncbitaxon-size" title="Link to this heading"></a></h2>
+<p>A full NCBITaxon load writes 2,708,804 class documents and 54,700,052 relation documents, 4.34 GB in MongoDB including indexes. Excluding the descendants of <code class="docutils literal notranslate"><span class="pre">NCBITaxon:6656</span></code> (Arthropoda) brings that to 1,742,956 classes, 27,958,594 relations and 2.12 GB. Both measured September 2026 from NCBITaxon semsql release 2025-12-03.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Author 1 &lt;smoxon@lbl.gov&gt;.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
