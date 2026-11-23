@@ -55,6 +55,19 @@ For a local trial, load into a new database and check it before switching reader
 
 Meticulous deletes the cached source and downloads it again. Fast-initial reuses the cached source and downloads only when it's missing. There's no separate refresh option, so deleting the MongoDB documents and running fast-initial can reload the same old snapshot. Download the new source before deleting anything.
 
+## The same ontologies in the KBase lakehouse
+
+The BERDL lakehouse already holds semsql tables (`statements`, `entailed_edge` and `prefix`) in `refdata.ontology_source` and `kbase.ontology_source`. https://github.com/kbase/cdm-schema has an ontology module modelled on semsql. On 2026-11-23 both held the four ontologies this loader writes to MongoDB, counted as `entailed_edge` rows by subject prefix:
+
+| prefix | `entailed_edge` rows |
+| --- | ---: |
+| NCBITaxon | 64,150,757 |
+| UBERON | 4,083,776 |
+| ENVO | 365,421 |
+| PO | 109,441 |
+
+Not yet known: who loads these tables, which ontology release they hold, and whether anything that reads `ontology_class_set` and `ontology_relation_set` could read the lakehouse tables instead.
+
 ## Known gaps
 
 - Nothing records which ontology release a load came from, or whether it was subsetted. A subsetted load and one that failed partway look the same. https://github.com/microbiomedata/ontology-loader/issues/81
