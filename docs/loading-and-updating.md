@@ -14,7 +14,7 @@ The loader reads a semsql SQLite build of an ontology and writes NMDC schema `On
 
 Single-predicate closures such as `isa` skip SQLite's temporary deduplication B-tree. Multi-predicate closures such as `combined` still need it, so the NCBITaxon memory figures below don't bound `combined` on other large ontologies.
 
-`--exclude-descendants-of <CURIE>`, repeatable, leaves out the `rdfs:subClassOf` descendants of a term and keeps the term itself. Excluding `NCBITaxon:6656` (Arthropoda) cuts an NCBITaxon load from 4.34 GB to 2.12 GB on disk, because arthropods are 49.6 percent of the ancestry closure.
+`--exclude-descendants-of <CURIE>`, repeatable, leaves out the `rdfs:subClassOf` descendants of a term and keeps the term itself. Excluding `NCBITaxon:6656` (Arthropoda) cuts an NCBITaxon load from 4.34 GB to 2.12 GB on disk, because arthropods are 49.6 percent of the ancestry closure. The option filters only the current load. It doesn't delete documents that an earlier load stored, so getting the smaller collections needs an empty target database.
 
 ## Load into a local MongoDB
 
@@ -53,7 +53,7 @@ For a local trial, load into a new database and check it before switching reader
 
 ## Source freshness depends on the mode
 
-Meticulous deletes the cached source and downloads it again. Fast-initial reuses the cached source and downloads only when it's missing. There's no separate refresh option, so deleting the MongoDB documents and running fast-initial can reload the same old snapshot. Download the new source before deleting anything.
+Meticulous deletes the cached source and downloads it again. Fast-initial reuses the cached source and downloads only when it's missing. There's no separate refresh option, so deleting the MongoDB documents and running fast-initial can reload the same old snapshot. To reload a new release with fast-initial, first delete the ontology's whole pystow cache directory (by default `~/.pystow/<ontology>`), not only the `.db.gz` file, because the loader reuses an already-extracted `.db` file. Then check the new file's `owl:versionIRI` before deleting any MongoDB documents.
 
 ## The same ontologies in the KBase lakehouse
 
