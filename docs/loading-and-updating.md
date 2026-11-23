@@ -57,7 +57,7 @@ Meticulous deletes the cached source and downloads it again. Fast-initial reuses
 
 ## The same ontologies in the KBase lakehouse
 
-The BERDL lakehouse already holds semsql tables (`statements`, `entailed_edge` and `prefix`) in `refdata.ontology_source` and `kbase.ontology_source`. https://github.com/kbase/cdm-schema has an ontology module modelled on semsql. On 2026-11-23 both held the four ontologies this loader writes to MongoDB, counted as `entailed_edge` rows by subject prefix:
+The KBase lakehouse, K-BERDL, already holds semsql tables (`statements`, `entailed_edge` and `prefix`) in `refdata.ontology_source` and `kbase.ontology_source`. https://github.com/kbase/cdm-schema has an ontology module modelled on semsql. On 2026-11-23 both held the four ontologies this loader writes to MongoDB, counted as `entailed_edge` rows by subject prefix:
 
 | prefix | `entailed_edge` rows |
 | --- | ---: |
@@ -66,7 +66,9 @@ The BERDL lakehouse already holds semsql tables (`statements`, `entailed_edge` a
 | ENVO | 365,421 |
 | PO | 109,441 |
 
-Not yet known: who loads these tables, which ontology release they hold, and whether anything that reads `ontology_class_set` and `ontology_relation_set` could read the lakehouse tables instead.
+The same tables will likely be added to the BRIDGE lakehouse too.
+
+Not yet known: which code loads these tables into K-BERDL, which ontology release they hold, and whether anything that reads `ontology_class_set` and `ontology_relation_set` could read the lakehouse tables instead.
 
 ## Known gaps
 
