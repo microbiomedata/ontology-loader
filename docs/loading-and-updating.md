@@ -57,18 +57,9 @@ Running in `meticulous` mode deletes the cached source and downloads it again. R
 
 ## The same ontologies in the KBase lakehouse
 
-The KBase lakehouse, K-BERDL, already holds semsql tables (`statements`, `entailed_edge` and `prefix`) in `refdata.ontology_source` and `kbase.ontology_source`. https://github.com/kbase/cdm-schema has an ontology module modelled on semsql. On 2026-11-23 both held the four ontologies this loader writes to MongoDB, counted as `entailed_edge` rows by subject prefix:
+This loader may stop being needed. The data lakehouse that KBase runs, K-BERDL (https://hub.berdl.kbase.us), already holds NCBITaxon, ENVO, UBERON and PO as semsql tables (`statements`, `entailed_edge` and `prefix`) in `refdata.ontology_source` and `kbase.ontology_source`. The BRIDGE lakehouse will likely get the same tables. If the NMDC applications that read ontology terms could read them from a lakehouse, they wouldn't need the MongoDB copies this loader writes.
 
-| prefix | `entailed_edge` rows |
-| --- | ---: |
-| NCBITaxon | 64,150,757 |
-| UBERON | 4,083,776 |
-| ENVO | 365,421 |
-| PO | 109,441 |
-
-The same tables will likely be added to the BRIDGE lakehouse too.
-
-Not yet known: which code loads these tables into K-BERDL, which ontology release they hold, and whether anything that reads `ontology_class_set` and `ontology_relation_set` could read the lakehouse tables instead.
+Not yet known: which code loads these tables into K-BERDL, which ontology release they hold, and which NMDC applications read `ontology_class_set` and `ontology_relation_set` today.
 
 ## Known gaps
 
