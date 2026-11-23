@@ -28,7 +28,7 @@ The pymongo path is a *bypass*, not a permanent split. Upstream issue [`linkml/l
 
 #### Pre-requisites
 
-- >=Python 3.10
+- >=Python 3.12
 - Poetry
 - Docker
 - MongoDB
