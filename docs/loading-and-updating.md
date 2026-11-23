@@ -1,6 +1,6 @@
 # Loading and updating ontologies
 
-The loader reads a semsql SQLite build of an ontology and writes NMDC schema `OntologyClass` and `OntologyRelation` documents to MongoDB's `ontology_class_set` and `ontology_relation_set`. It does not copy semsql tables into MongoDB.
+The loader reads an ontology from a SQLite database built by Semantic SQL (semsql, https://github.com/INCATools/semantic-sql) and writes NMDC schema (https://github.com/microbiomedata/nmdc-schema) `OntologyClass` and `OntologyRelation` documents to MongoDB's `ontology_class_set` and `ontology_relation_set`. It does not copy semsql tables into MongoDB. NMDC loads four ontologies this way: NCBITaxon (https://obofoundry.org/ontology/ncbitaxon.html), ENVO (https://obofoundry.org/ontology/envo.html), UBERON (https://obofoundry.org/ontology/uberon.html) and PO (https://obofoundry.org/ontology/po.html).
 
 ## Choose a mode and closure
 
@@ -10,7 +10,7 @@ The loader reads a semsql SQLite build of an ontology and writes NMDC schema `On
 | Replace NCBITaxon with a new snapshot | `ncbitaxon` | `fast-initial`, after removing the old contents | `isa` |
 | First load or routine update of ENVO, UBERON or PO | `envo`, `uberon`, `po` | `meticulous` | `combined` |
 
-`isa` writes `entailed_isa_closure`. NCBITaxon has no `part_of` edges in the snapshot tested. `combined` writes `entailed_isa_partof_closure`, which follows both `rdfs:subClassOf` and `BFO:0000050`. Direct relations are written in every case. `all` writes several closure predicates and isn't needed for these loads.
+The closure setting decides which ancestor relations are written for each class. `isa` writes `entailed_isa_closure`. NCBITaxon has no `part_of` edges in the snapshot tested. `combined` writes `entailed_isa_partof_closure`, which follows both `rdfs:subClassOf` (is a) and `BFO:0000050` (part of). Direct relations are written in every case. `all` writes several closure predicates and isn't needed for these loads.
 
 Single-predicate closures such as `isa` skip SQLite's temporary deduplication B-tree. Multi-predicate closures such as `combined` still need it, so the NCBITaxon memory figures below don't bound `combined` on other large ontologies.
 
@@ -53,7 +53,7 @@ For a local trial, load into a new database and check it before switching reader
 
 ## Source freshness depends on the mode
 
-Running in `meticulous` mode deletes the cached source and downloads it again. Running in `fast-initial` mode reuses the cached source and downloads it only when it's missing. There's no separate refresh option, so deleting the MongoDB documents and running `fast-initial` can reload the same old snapshot. To reload a new release with `fast-initial`, first delete the ontology's whole pystow cache directory (by default `~/.pystow/<ontology>`), not only the `.db.gz` file, because the loader reuses an already-extracted `.db` file. Then check the new file's `owl:versionIRI` before deleting any MongoDB documents.
+Running in `meticulous` mode deletes the cached source and downloads it again. Running in `fast-initial` mode reuses the cached source and downloads it only when it's missing. There's no separate refresh option, so deleting the MongoDB documents and running `fast-initial` can reload the same old snapshot. To reload a new release with `fast-initial`, first delete the ontology's whole cache directory (by default `~/.pystow/<ontology>`, managed by pystow, https://github.com/cthoyt/pystow), not only the `.db.gz` file, because the loader reuses an already-extracted `.db` file. Then check the new file's `owl:versionIRI` before deleting any MongoDB documents.
 
 ## The same ontologies in the KBase lakehouse
 
@@ -68,7 +68,7 @@ Not yet known: which code loads these tables into K-BERDL, which ontology releas
 - Class documents differ by mode: meticulous embeds relations and fast-initial doesn't. https://github.com/microbiomedata/ontology-loader/issues/78
 - The deprecated `generate_reports=False` argument now selects fast-initial, which skips updates to existing documents. https://github.com/microbiomedata/ontology-loader/issues/96
 - Peak memory isn't explained, so the headroom under the production worker's 12 GiB limit is unknown. https://github.com/microbiomedata/ontology-loader/issues/87
-- How nmdc-runtime should order and retry fast-initial reloads isn't settled. https://github.com/microbiomedata/nmdc-runtime/issues/1565
+- How nmdc-runtime (https://github.com/microbiomedata/nmdc-runtime) should order and retry fast-initial reloads isn't settled. https://github.com/microbiomedata/nmdc-runtime/issues/1565
 
 ## Reference NCBITaxon loads, September 2026
 
