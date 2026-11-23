@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-23
+
 ### Changed
 - **`oaklib` 0.7.5 is now the minimum.** `oaklib` 0.7.4 capped `setuptools` below 82, which kept this repo and its consumers off the `setuptools` releases that fix two security advisories (fixed in 83.0.0 and 84.1.0). `oaklib` 0.7.5 replaced its `eutils` dependency with its own calls to the NCBI EFetch API and dropped the cap. See https://github.com/INCATools/ontology-access-kit/pull/926. `poetry.lock` now has `setuptools` 84.2.1.
 
