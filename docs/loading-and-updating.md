@@ -57,7 +57,7 @@ Running in `meticulous` mode deletes the cached source and downloads it again. R
 
 ## The same ontologies in the KBase lakehouse
 
-This loader may stop being needed. The data lakehouse that KBase runs, K-BERDL (https://hub.berdl.kbase.us), already holds NCBITaxon, ENVO, UBERON and PO as semsql tables (`statements`, `entailed_edge` and `prefix`) in `refdata.ontology_source` and `kbase.ontology_source`. The BRIDGE lakehouse will likely get the same tables. If the NMDC applications that read ontology terms could read them from a lakehouse, they wouldn't need the MongoDB copies this loader writes.
+The data lakehouse that KBase runs, K-BERDL (https://hub.berdl.kbase.us), already holds NCBITaxon, ENVO, UBERON and PO as semsql tables (`statements`, `entailed_edge` and `prefix`) in `refdata.ontology_source` and `kbase.ontology_source`. The BRIDGE lakehouse will likely get the same tables. If the NMDC applications that read ontology terms could read them from a lakehouse instead, NMDC would no longer need this loader or the MongoDB copies it writes.
 
 Not yet known: which code loads these tables into K-BERDL, which ontology release they hold, and which NMDC applications read `ontology_class_set` and `ontology_relation_set` today.
 
