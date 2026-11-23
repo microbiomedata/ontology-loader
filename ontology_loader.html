@@ -1,0 +1,527 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ontology_loader package &mdash; ontology-loader 0.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/sphinx_autodoc_typehints.css?v=057ac668" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=7026087e"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="ontology_loader" href="modules.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            ontology-loader
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">ontology_loader</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">ontology_loader package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ontology_loader.cli">ontology_loader.cli module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ontology_loader.mongo_db_config">ontology_loader.mongo_db_config module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ontology_loader.mongo_db_config.MongoDBConfig"><code class="docutils literal notranslate"><span class="pre">MongoDBConfig</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ontology_loader.mongodb_loader">ontology_loader.mongodb_loader module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ontology_loader.mongodb_loader.MongoDBLoader"><code class="docutils literal notranslate"><span class="pre">MongoDBLoader</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ontology_loader.mongodb_loader.get_mongo_connection_string"><code class="docutils literal notranslate"><span class="pre">get_mongo_connection_string()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ontology_loader.ontology_load_controller">ontology_loader.ontology_load_controller module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ontology_loader.ontology_load_controller.OntologyLoaderController"><code class="docutils literal notranslate"><span class="pre">OntologyLoaderController</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ontology_loader.ontology_processor">ontology_loader.ontology_processor module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ontology_loader.ontology_processor.OntologyProcessor"><code class="docutils literal notranslate"><span class="pre">OntologyProcessor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ontology_loader.ontology_processor.normalize_curie_list"><code class="docutils literal notranslate"><span class="pre">normalize_curie_list()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ontology_loader.reporter">ontology_loader.reporter module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ontology_loader.reporter.Report"><code class="docutils literal notranslate"><span class="pre">Report</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ontology_loader.reporter.ReportWriter"><code class="docutils literal notranslate"><span class="pre">ReportWriter</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ontology_loader.utils">ontology_loader.utils module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ontology_loader.utils.load_yaml_from_package"><code class="docutils literal notranslate"><span class="pre">load_yaml_from_package()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ontology_loader">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ontology-loader</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">ontology_loader</a></li>
+      <li class="breadcrumb-item active">ontology_loader package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/ontology_loader.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ontology-loader-package">
+<h1>ontology_loader package<a class="headerlink" href="#ontology-loader-package" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-ontology_loader.cli">
+<span id="ontology-loader-cli-module"></span><h2>ontology_loader.cli module<a class="headerlink" href="#module-ontology_loader.cli" title="Link to this heading"></a></h2>
+<p>Command-line interface for the ontology loader.</p>
+</section>
+<section id="module-ontology_loader.mongo_db_config">
+<span id="ontology-loader-mongo-db-config-module"></span><h2>ontology_loader.mongo_db_config module<a class="headerlink" href="#module-ontology_loader.mongo_db_config" title="Link to this heading"></a></h2>
+<p>Singleton class to store default parameters accessed from client environment or sensible defaults.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ontology_loader.mongo_db_config.MongoDBConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ontology_loader.mongo_db_config.</span></span><span class="sig-name descname"><span class="pre">MongoDBConfig</span></span><a class="headerlink" href="#ontology_loader.mongo_db_config.MongoDBConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Singleton class to store default parameters accessed from client environment or sensible defaults.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.mongo_db_config.MongoDBConfig.has_existing_client">
+<span class="sig-name descname"><span class="pre">has_existing_client</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.mongo_db_config.MongoDBConfig.has_existing_client" title="Link to this definition"></a></dt>
+<dd><p>Check if an existing MongoDB client has been set.</p>
+<section id="returns">
+<h3>Returns<a class="headerlink" href="#returns" title="Link to this heading"></a></h3>
+<blockquote>
+<div><p>bool: True if an existing client is available, False otherwise</p>
+</div></blockquote>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.mongo_db_config.MongoDBConfig.set_existing_client">
+<span class="sig-name descname"><span class="pre">set_existing_client</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">client</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.mongo_db_config.MongoDBConfig.set_existing_client" title="Link to this definition"></a></dt>
+<dd><p>Set an existing MongoDB client instance.</p>
+<p>When set, this client will be used instead of creating a new connection.</p>
+<section id="args">
+<h3>Args:<a class="headerlink" href="#args" title="Link to this heading"></a></h3>
+<blockquote>
+<div><p>client: An existing pymongo.MongoClient instance</p>
+</div></blockquote>
+</section>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-ontology_loader.mongodb_loader">
+<span id="ontology-loader-mongodb-loader-module"></span><h2>ontology_loader.mongodb_loader module<a class="headerlink" href="#module-ontology_loader.mongodb_loader" title="Link to this heading"></a></h2>
+<p>Load and process ontology terms and relations into MongoDB.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ontology_loader.mongodb_loader.MongoDBLoader">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ontology_loader.mongodb_loader.</span></span><span class="sig-name descname"><span class="pre">MongoDBLoader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">schema_view</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mongo_client</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">db_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.mongodb_loader.MongoDBLoader" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>MongoDB Loader class to upsert OntologyClass objects and insert OntologyRelation objects into MongoDB.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.mongodb_loader.MongoDBLoader.insert_ontology_data_fast_initial">
+<span class="sig-name descname"><span class="pre">insert_ontology_data_fast_initial</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ontology_classes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ontology_relations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_collection_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ontology_class_set'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relation_collection_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ontology_relation_set'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5000</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.mongodb_loader.MongoDBLoader.insert_ontology_data_fast_initial" title="Link to this definition"></a></dt>
+<dd><p>Fast-initial mode: raw pymongo <code class="docutils literal notranslate"><span class="pre">insert_many</span></code> with no upsert and no reporting.</p>
+<p>Intended for first-time installs of large ontologies (e.g. NCBITaxon, 2.7M classes + 54.7M relations)
+where pre-read + upsert overhead dominates wall-clock. This method does not pre-clear and does not
+produce TSV reports. It does, however, guard against duplicate inserts: it declares a unique index on
+<code class="docutils literal notranslate"><span class="pre">id</span></code> (classes) / <code class="docutils literal notranslate"><span class="pre">(subject,</span> <span class="pre">predicate,</span> <span class="pre">object)</span></code> (relations) before inserting, so that rerunning
+against already-populated collections skips the documents that are already present — logged, not
+silently duplicated — instead of either doubling the data (no index) or aborting the whole remaining
+load on the first collision (index present but errors uncaught). See <code class="docutils literal notranslate"><span class="pre">_bulk_insert_iter</span></code>.</p>
+<p>These are separately-named indexes from the non-unique ones <code class="docutils literal notranslate"><span class="pre">upsert_ontology_data</span></code> declares on the
+same fields, so this is purely additive: it does not touch or rebuild the meticulous path’s existing
+indexes on these shared collections. It does, however, require the target collection to already be
+duplicate-free on <code class="docutils literal notranslate"><span class="pre">id</span></code> / <code class="docutils literal notranslate"><span class="pre">(subject,</span> <span class="pre">predicate,</span> <span class="pre">object)</span></code> for the index build itself to succeed —
+MongoDB rejects building a unique index over data that already contains a duplicate. That is not
+expected in practice (the meticulous path naturally dedupes by upserting on the same keys, and
+NCBITaxon — the actual production driver for this method — only ever loads into an initially-empty
+collection), but if it happens, see the <code class="docutils literal notranslate"><span class="pre">OperationFailure</span></code> handling below for what is reported.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ontology_classes</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Iterable</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">OntologyClass</span></code>]</span>) – An iterable of OntologyClass objects to insert.</p></li>
+<li><p><strong>ontology_relations</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Iterable</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">OntologyRelation</span></code> | <code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>]</span>) – An iterable of OntologyRelation objects or dictionaries to insert.</p></li>
+<li><p><strong>class_collection_name</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – MongoDB collection name for ontology classes.</p></li>
+<li><p><strong>relation_collection_name</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – MongoDB collection name for ontology relations.</p></li>
+<li><p><strong>batch_size</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Documents per <code class="docutils literal notranslate"><span class="pre">insert_many</span></code> call. Default 5000.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Inserted class and relation counts, excluding skipped duplicates.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>OperationFailure</strong> – if either index build fails because the collection already contains
+duplicate values on the indexed key — this indicates genuinely dirty pre-existing data, not
+something this method can safely repair automatically. Deduplicate the collection first.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.mongodb_loader.MongoDBLoader.upsert_ontology_data">
+<span class="sig-name descname"><span class="pre">upsert_ontology_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ontology_classes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ontology_relations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_collection_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ontology_class_set'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relation_collection_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ontology_relation_set'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.mongodb_loader.MongoDBLoader.upsert_ontology_data" title="Link to this definition"></a></dt>
+<dd><p>Meticulous-mode load: upsert via linkml-store per-item.</p>
+<p>Upsert ontology terms and relations incrementally, handle obsolescence, and manage hierarchy changes.
+Relations are upserted individually; the collection is not cleared before loading, allowing multiple
+ontologies to be loaded sequentially. This is the path that produces the TSV reports and matches
+Sierra’s 0.2.x behavior. For maximum-throughput first-time loads, see
+<a class="reference internal" href="#ontology_loader.mongodb_loader.MongoDBLoader.insert_ontology_data_fast_initial" title="ontology_loader.mongodb_loader.MongoDBLoader.insert_ontology_data_fast_initial"><code class="xref py py-meth docutils literal notranslate"><span class="pre">insert_ontology_data_fast_initial()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ontology_classes</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">OntologyClass</span></code>]</span>) – A list of OntologyClass objects to upsert.</p></li>
+<li><p><strong>ontology_relations</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">OntologyRelation</span></code>]</span>) – A list of OntologyRelation objects to upsert.</p></li>
+<li><p><strong>class_collection_name</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – MongoDB collection name for ontology classes.</p></li>
+<li><p><strong>relation_collection_name</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – MongoDB collection name for ontology relations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple of three reports: class updates, class insertions, and relation insertions.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ontology_loader.mongodb_loader.get_mongo_connection_string">
+<span class="sig-prename descclassname"><span class="pre">ontology_loader.mongodb_loader.</span></span><span class="sig-name descname"><span class="pre">get_mongo_connection_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_config</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.mongodb_loader.get_mongo_connection_string" title="Link to this definition"></a></dt>
+<dd><p>Generate a formatted MongoDB connection string from a db_config object.</p>
+<section id="id1">
+<h3>Args:<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<blockquote>
+<div><p>db_config: An object containing MongoDB connection parameters.</p>
+</div></blockquote>
+</section>
+<section id="id2">
+<h3>Returns:<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<blockquote>
+<div><p>str: A properly formatted MongoDB connection string.</p>
+</div></blockquote>
+</section>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-ontology_loader.ontology_load_controller">
+<span id="ontology-loader-ontology-load-controller-module"></span><h2>ontology_loader.ontology_load_controller module<a class="headerlink" href="#module-ontology_loader.ontology_load_controller" title="Link to this heading"></a></h2>
+<p>Controller that orchestrates OntologyProcessor + MongoDBLoader for one or more ontologies.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ontology_loader.ontology_load_controller.OntologyLoaderController">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ontology_loader.ontology_load_controller.</span></span><span class="sig-name descname"><span class="pre">OntologyLoaderController</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_ontology</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'envo'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_directory</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;object</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">generate_reports</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;object</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mongo_client</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">db_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">report_directory</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'meticulous'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">closure</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'combined'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_descendants_of</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.ontology_load_controller.OntologyLoaderController" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Orchestrates extraction + loading of one or more ontologies into MongoDB.</p>
+<section id="migrating-from-0-2-x">
+<h3>Migrating from 0.2.x<a class="headerlink" href="#migrating-from-0-2-x" title="Link to this heading"></a></h3>
+<p>The constructor now accepts a richer set of kwargs and keeps the 0.2.x ones working as deprecated
+aliases. Each deprecated kwarg emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> and either no-ops or maps onto a new
+kwarg. See <code class="docutils literal notranslate"><span class="pre">CHANGELOG.md</span></code> and the README’s “Migrating from 0.2.x” section for the full table.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>old kwarg</p></th>
+<th class="head"><p>new kwarg</p></th>
+<th class="head"><p>behavior</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>source_ontology=&lt;str&gt;</p></td>
+<td><p>source_ontology=&lt;str|list&gt;</p></td>
+<td><p>unchanged; now also accepts a list of strings</p></td>
+</tr>
+<tr class="row-odd"><td><p>output_directory=&lt;str&gt;</p></td>
+<td><p>report_directory=&lt;str&gt;</p></td>
+<td><p>renamed; old kwarg is an alias with
+DeprecationWarning. Passing both raises.</p></td>
+</tr>
+<tr class="row-even"><td><p>generate_reports=True</p></td>
+<td><p>(gone — implicit)</p></td>
+<td><p>no-op with DeprecationWarning (True was always
+the default).</p></td>
+</tr>
+<tr class="row-odd"><td><p>generate_reports=False</p></td>
+<td><p>mode=’fast-initial’</p></td>
+<td><p>mapped to <code class="docutils literal notranslate"><span class="pre">mode='fast-initial'</span></code> with
+DeprecationWarning. If <code class="docutils literal notranslate"><span class="pre">mode</span></code> was also passed
+explicitly, raises.</p></td>
+</tr>
+<tr class="row-even"><td><p>(none)</p></td>
+<td><p>mode=’meticulous’</p></td>
+<td><p>new kwarg. Default <code class="docutils literal notranslate"><span class="pre">'meticulous'</span></code> preserves
+0.2.x behavior (per-item upsert via
+linkml-store + TSV reports).</p></td>
+</tr>
+<tr class="row-odd"><td><p>(none)</p></td>
+<td><p>closure=’combined’</p></td>
+<td><p>new kwarg. Default <code class="docutils literal notranslate"><span class="pre">'combined'</span></code> preserves
+0.2.x behavior. Accepts a string or list;
+values <code class="docutils literal notranslate"><span class="pre">'combined'</span></code>, <code class="docutils literal notranslate"><span class="pre">'isa'</span></code>, <code class="docutils literal notranslate"><span class="pre">'partof'</span></code>,
+<code class="docutils literal notranslate"><span class="pre">'all'</span></code>, <code class="docutils literal notranslate"><span class="pre">'none'</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py property">
+<dt class="sig sig-object py" id="ontology_loader.ontology_load_controller.OntologyLoaderController.output_directory">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">output_directory</span></span><a class="headerlink" href="#ontology_loader.ontology_load_controller.OntologyLoaderController.output_directory" title="Link to this definition"></a></dt>
+<dd><p>0.2.x compatibility alias for <code class="docutils literal notranslate"><span class="pre">report_directory</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.ontology_load_controller.OntologyLoaderController.run_ontology_loader">
+<span class="sig-name descname"><span class="pre">run_ontology_loader</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.ontology_load_controller.OntologyLoaderController.run_ontology_loader" title="Link to this definition"></a></dt>
+<dd><p>Process each requested ontology in turn; route writes to the configured mode.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="ontology_loader.ontology_load_controller.OntologyLoaderController.source_ontology">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">source_ontology</span></span><a class="headerlink" href="#ontology_loader.ontology_load_controller.OntologyLoaderController.source_ontology" title="Link to this definition"></a></dt>
+<dd><p>0.2.x compatibility: scalar accessor for the first source ontology.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+</section>
+<section id="module-ontology_loader.ontology_processor">
+<span id="ontology-loader-ontology-processor-module"></span><h2>ontology_loader.ontology_processor module<a class="headerlink" href="#module-ontology_loader.ontology_processor" title="Link to this heading"></a></h2>
+<p>Ontology Processor class to process ontology terms and relations.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ontology_loader.ontology_processor.OntologyProcessor">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ontology_loader.ontology_processor.</span></span><span class="sig-name descname"><span class="pre">OntologyProcessor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ontology</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force_refresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_descendants_of</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.ontology_processor.OntologyProcessor" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Ontology Processor class to process ontology terms and relations.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.ontology_processor.OntologyProcessor.download_and_prepare_ontology">
+<span class="sig-name descname"><span class="pre">download_and_prepare_ontology</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.ontology_processor.OntologyProcessor.download_and_prepare_ontology" title="Link to this definition"></a></dt>
+<dd><p>Download and prepare the ontology database for processing.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.ontology_processor.OntologyProcessor.get_relations_closure">
+<span class="sig-name descname"><span class="pre">get_relations_closure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">closure</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'combined'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ontology_terms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.ontology_processor.OntologyProcessor.get_relations_closure" title="Link to this definition"></a></dt>
+<dd><p>Retrieve ontology direct relations + ancestry closure for the configured ontology.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>closure</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Iterable</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>]]</span>) – <p>A closure spec — either a single string or an iterable of strings drawn from
+{‘combined’, ‘isa’, ‘partof’, ‘all’, ‘none’}. Multiple values combine: e.g.
+<code class="docutils literal notranslate"><span class="pre">['combined',</span> <span class="pre">'isa']</span></code> emits both <code class="docutils literal notranslate"><span class="pre">entailed_isa_partof_closure</span></code> and
+<code class="docutils literal notranslate"><span class="pre">entailed_isa_closure</span></code>. <code class="docutils literal notranslate"><span class="pre">'all'</span></code> and <code class="docutils literal notranslate"><span class="pre">'none'</span></code> are convenience values and are each
+exclusive — passing either together with any other value raises ValueError.</p>
+<ul>
+<li><p>’combined’: rdfs:subClassOf + BFO:0000050 → entailed_isa_partof_closure (Sierra default)</p></li>
+<li><p>’isa’: rdfs:subClassOf → entailed_isa_closure</p></li>
+<li><p>’partof’: BFO:0000050 → entailed_partof_closure</p></li>
+<li><p>’all’: expands to ‘combined’, ‘isa’, and ‘partof’</p></li>
+<li><p>’none’: no ancestry closure; only direct relationships</p></li>
+</ul>
+</p></li>
+<li><p><strong>ontology_terms</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">OntologyClass</span></code>] | <span class="highlight sphinx_autodoc_typehints-value"><code class="xref py py-obj docutils literal notranslate"><span class="kc"><span class="pre">None</span></span></code></span></span>) – List of OntologyClass objects (default: None).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">OntologyClass</span></code>]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple of (ontology_relations, updated_ontology_terms).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.ontology_processor.OntologyProcessor.get_terms_and_metadata">
+<span class="sig-name descname"><span class="pre">get_terms_and_metadata</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.ontology_processor.OntologyProcessor.get_terms_and_metadata" title="Link to this definition"></a></dt>
+<dd><p>Return all ontology classes as a list for meticulous loading.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">OntologyClass</span></code>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.ontology_processor.OntologyProcessor.iter_relations_closure">
+<span class="sig-name descname"><span class="pre">iter_relations_closure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">closure</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'combined'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.ontology_processor.OntologyProcessor.iter_relations_closure" title="Link to this definition"></a></dt>
+<dd><p>Yield relation dictionaries without retaining classes or embedding relations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Iterator</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.ontology_processor.OntologyProcessor.iter_terms_and_metadata">
+<span class="sig-name descname"><span class="pre">iter_terms_and_metadata</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.ontology_processor.OntologyProcessor.iter_terms_and_metadata" title="Link to this definition"></a></dt>
+<dd><p>Yield ontology classes without retaining them or embedding relations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Iterator</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">OntologyClass</span></code>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ontology_loader.ontology_processor.normalize_curie_list">
+<span class="sig-prename descclassname"><span class="pre">ontology_loader.ontology_processor.</span></span><span class="sig-name descname"><span class="pre">normalize_curie_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">curies</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.ontology_processor.normalize_curie_list" title="Link to this definition"></a></dt>
+<dd><p>Return CURIEs as a deduplicated tuple, treating a bare string as one CURIE.</p>
+<p><code class="docutils literal notranslate"><span class="pre">str</span></code> satisfies <code class="docutils literal notranslate"><span class="pre">Iterable[str]</span></code>, so a caller passing a single CURIE rather
+than a sequence would otherwise have it iterated character by character. That
+fails silently: the placeholders match nothing, the exclusion set is empty, and
+the load quietly runs unfiltered. Verified before this guard existed:
+<code class="docutils literal notranslate"><span class="pre">exclude_descendants_of=&quot;ENVO:01000254&quot;</span></code> excluded 0 terms where the same value
+in a tuple excluded 400.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">...</span></code>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-ontology_loader.reporter">
+<span id="ontology-loader-reporter-module"></span><h2>ontology_loader.reporter module<a class="headerlink" href="#module-ontology_loader.reporter" title="Link to this heading"></a></h2>
+<p>Reporting class to handle TSV dumping.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ontology_loader.reporter.Report">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ontology_loader.reporter.</span></span><span class="sig-name descname"><span class="pre">Report</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">report_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">records</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">headers</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.reporter.Report" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class to hold report data.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ontology_loader.reporter.ReportWriter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ontology_loader.reporter.</span></span><span class="sig-name descname"><span class="pre">ReportWriter</span></span><a class="headerlink" href="#ontology_loader.reporter.ReportWriter" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>ReportWriter class to write reports to TSV files.</p>
+<p>This class provides a static method to write reports to TSV files in a given directory.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="ontology_loader.reporter.ReportWriter.write_reports">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">write_reports</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reports</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'tsv'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_directory</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.reporter.ReportWriter.write_reports" title="Link to this definition"></a></dt>
+<dd><p>Write reports to a directory, creating one in a temporary location if not provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reports</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<a class="reference internal" href="#ontology_loader.reporter.Report" title="ontology_loader.reporter.Report"><code class="xref py py-class docutils literal notranslate"><span class="pre">Report</span></code></a>]</span>) – A list of Report objects to write to files</p></li>
+<li><p><strong>output_format</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – The output format for the reports (default: “tsv”)</p></li>
+<li><p><strong>output_directory</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>]</span>) – The directory to write the reports to (default: None)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-ontology_loader.utils">
+<span id="ontology-loader-utils-module"></span><h2>ontology_loader.utils module<a class="headerlink" href="#module-ontology_loader.utils" title="Link to this heading"></a></h2>
+<p>Loads a YAML file from a given package.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="ontology_loader.utils.load_yaml_from_package">
+<span class="sig-prename descclassname"><span class="pre">ontology_loader.utils.</span></span><span class="sig-name descname"><span class="pre">load_yaml_from_package</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">package</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ontology_loader.utils.load_yaml_from_package" title="Link to this definition"></a></dt>
+<dd><p>Load a YAML file from a given package.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>package</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – The package where the YAML file is located (e.g., “nmdc_schema”).</p></li>
+<li><p><strong>filename</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – The YAML file to load (e.g., “nmdc_materialized_patterns.yaml”).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">SchemaView</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Parsed YAML data as a Python dictionary.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-ontology_loader">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-ontology_loader" title="Link to this heading"></a></h2>
+<p>Ontology Loader package.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modules.html" class="btn btn-neutral float-left" title="ontology_loader" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Author 1 &lt;smoxon@lbl.gov&gt;.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

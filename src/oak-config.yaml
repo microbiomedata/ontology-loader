@@ -1,9 +1,0 @@
-ontology_resources:
-  envo:
-    selector: sqlite:obo:envo
-  go:
-    selector: sqlite:obo:go
-  po:
-    selector: sqlite:obo:po
-  uberon:
-    selector: sqlite:obo:uberon

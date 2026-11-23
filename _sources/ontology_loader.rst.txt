@@ -1,0 +1,69 @@
+ontology\_loader package
+========================
+
+Submodules
+----------
+
+ontology\_loader.cli module
+---------------------------
+
+.. automodule:: ontology_loader.cli
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+ontology\_loader.mongo\_db\_config module
+-----------------------------------------
+
+.. automodule:: ontology_loader.mongo_db_config
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+ontology\_loader.mongodb\_loader module
+---------------------------------------
+
+.. automodule:: ontology_loader.mongodb_loader
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+ontology\_loader.ontology\_load\_controller module
+--------------------------------------------------
+
+.. automodule:: ontology_loader.ontology_load_controller
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+ontology\_loader.ontology\_processor module
+-------------------------------------------
+
+.. automodule:: ontology_loader.ontology_processor
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+ontology\_loader.reporter module
+--------------------------------
+
+.. automodule:: ontology_loader.reporter
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+ontology\_loader.utils module
+-----------------------------
+
+.. automodule:: ontology_loader.utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: ontology_loader
+   :members:
+   :show-inheritance:
+   :undoc-members:
