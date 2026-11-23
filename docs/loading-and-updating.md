@@ -12,8 +12,6 @@ The loader reads an ontology from a SQLite database built by Semantic SQL (semsq
 
 The closure setting decides which ancestor relations are written for each class. `isa` writes `entailed_isa_closure`. NCBITaxon has no `part_of` edges in the snapshot tested. `combined` writes `entailed_isa_partof_closure`, which follows both `rdfs:subClassOf` (is a) and `BFO:0000050` (part of). Direct relations are written in every case. `all` writes several closure predicates and isn't needed for these loads.
 
-Single-predicate closures such as `isa` skip SQLite's temporary deduplication B-tree. Multi-predicate closures such as `combined` still need it, so the NCBITaxon memory figures below don't bound `combined` on other large ontologies.
-
 `--exclude-descendants-of <CURIE>`, repeatable, leaves out the `rdfs:subClassOf` descendants of a term and keeps the term itself. Excluding `NCBITaxon:6656` (Arthropoda) cuts an NCBITaxon load from 4.34 GB to 2.12 GB on disk, because arthropods are 49.6 percent of the ancestry closure. The option filters only the current load. It doesn't delete documents that an earlier load stored, so getting the smaller collections needs an empty target database.
 
 ## Load into a local MongoDB
@@ -47,7 +45,7 @@ Each ontology gets its own report subdirectory. Run NCBITaxon separately.
 
 - Retry a snapshot with `fast-initial`. It skips class IDs and relation triples that already exist and inserts the missing ones, so it can finish a partial load without duplicates. It doesn't update existing labels or definitions, so if the source changed between runs the result mixes snapshots.
 - Update with `meticulous`. It inserts and updates class documents and relation triples, handles obsolete classes, and writes reports. It doesn't delete a relation that disappeared from the new source, so MongoDB won't exactly mirror the source.
-- Replace by removing the old contents and then running `fast-initial`. The loader doesn't clear collections itself. https://github.com/microbiomedata/nmdc-runtime/pull/1562 proposes a scoped delete followed by a fast-initial reload. The data is missing or partial until the reload finishes. The NCBITaxon prefix has been checked for this. Check other ontologies before deleting by prefix, because their terms can reference other ontologies.
+- Replace by removing the old contents and then running `fast-initial`. The loader doesn't clear collections itself. https://github.com/microbiomedata/nmdc-runtime/pull/1562 proposes a scoped delete followed by a fast-initial reload. The data is missing or partial until the reload finishes. Check each ontology before deleting its documents by ID prefix, because one ontology's load can include terms from another ontology.
 
 For a local trial, load into a new database and check it before switching readers to it. That keeps the previous snapshot. The loader doesn't switch readers.
 
@@ -69,21 +67,9 @@ Not yet known: which code loads the K-BERDL tables, and which ontology releases 
 - Refreshing the source is tied to the mode. https://github.com/microbiomedata/ontology-loader/issues/13
 - Class documents differ by mode: meticulous embeds relations and fast-initial doesn't. https://github.com/microbiomedata/ontology-loader/issues/78
 - The deprecated `generate_reports=False` argument now selects fast-initial, which skips updates to existing documents. https://github.com/microbiomedata/ontology-loader/issues/96
-- Peak memory isn't explained, so the headroom under the production worker's 12 GiB limit is unknown. https://github.com/microbiomedata/ontology-loader/issues/87
+- Peak memory isn't explained, so it's unknown how close an NCBITaxon load comes to the 12 GiB memory limit of the nmdc-runtime job that runs the loader. https://github.com/microbiomedata/ontology-loader/issues/87
 - How nmdc-runtime (https://github.com/microbiomedata/nmdc-runtime) should order and retry fast-initial reloads isn't settled. https://github.com/microbiomedata/nmdc-runtime/issues/1565
 
-## Reference NCBITaxon loads, September 2026
+## NCBITaxon size
 
-Two complete loads on an Apple M5 laptop with a local MongoDB, from NCBITaxon semsql release 2025-12-03, both excluding the descendants of `NCBITaxon:6656` (Arthropoda). The second run included the change that computes `is_root` in SQL.
-
-| | before | after |
-|---|---:|---:|
-| class documents | 1,742,956 | 1,742,956 |
-| relation documents | 27,958,594 | 27,958,594 |
-| on disk, both collections | 2.12 GB | 2.12 GB |
-| wall time | 30.7 min | 29.0 min |
-| peak RSS | 6.22 GB | 7.01 GB |
-
-A full load with no exclusion is 2,708,804 classes, 54,700,052 relations, and 4.34 GB on disk, of which 2.79 GB is indexes.
-
-Peak memory rose after a change that should have lowered it (https://github.com/microbiomedata/ontology-loader/issues/87), so treat the peak RSS figures as unexplained. Wall times are from a laptop and won't match the production worker. Disk sizes should.
+A full NCBITaxon load writes 2,708,804 class documents and 54,700,052 relation documents, 4.34 GB in MongoDB including indexes. Excluding the descendants of `NCBITaxon:6656` (Arthropoda) brings that to 1,742,956 classes, 27,958,594 relations and 2.12 GB. Both measured September 2026 from NCBITaxon semsql release 2025-12-03.
